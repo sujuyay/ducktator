@@ -1,6 +1,7 @@
 import { LineupSimulator, PLAYER_COUNT } from '@jkim430/lineup'
 import type { DeepPartial, LineupSettings, RotationValidator } from '@jkim430/lineup'
 import '@jkim430/lineup/style.css'
+import { Header } from './Header'
 
 
 // Bench method: scale the required females on court to the roster size -
@@ -81,7 +82,12 @@ const settings: DeepPartial<LineupSettings> = {
 
 // Analytics intentionally not wired up yet (will pass onTrack later).
 function App() {
-  return <LineupSimulator settings={settings} />
+  return (
+    <>
+      <Header />
+      <LineupSimulator settings={settings} />
+    </>
+  )
 }
 
 export default App
