@@ -21,9 +21,6 @@ const benchMinFemales: RotationValidator = (lineup) => {
 // must be back in the court's back row.
 const subsLiberoCourtRule: RotationValidator = (lineup, rotationIndex, phase) => {
   const court = lineup.rotations[rotationIndex]?.[phase]?.court;
-  // Only validate a fully-filled court (skip rotation 1 mid-setup).
-  if (!court || !court.every((c) => c.playerId)) return { messages: [] };
-
   const liberoId = Object.values(lineup.roster).find((p) => p.position === 'libero')?.id;
   const girls = court.filter((c) => lineup.roster[c.playerId]?.gender === 'female').length;
   const backRow = court.slice(PLAYER_COUNT / 2);
@@ -49,16 +46,55 @@ const subsLiberoCourtRule: RotationValidator = (lineup, rotationIndex, phase) =>
   return { messages: ['Must have 2 females on court'] };
 };
 
+// Bench method: when the libero would rotate off the back row it moves to the
+// libero bench and its substitute plays, so the libero "sits out" until brought
+// back. She may sit out at most N consecutive rotations, where N is the larger
+// of the two side benches (the players cycling through court on that side). A
+// rotation only counts as a sit-out when the libero is off court in both its
+// serve and receive formations. Only the offending rotations are flagged: this
+// rotation is invalid when the run of consecutive sit-outs ending at it exceeds
+// N (so the first N out-rotations pass and each one after must have her back).
+// The run is counted backwards, wrapping around the cycle. (The library only
+// runs validators on a full court.)
+const liberoBenchStreak: RotationValidator = (lineup, rotationIndex) => {
+  const liberoId = Object.values(lineup.roster).find((p) => p.position === 'libero')?.id;
+  const rotations = lineup.rotations;
+  if (!liberoId || rotations.length === 0) return { messages: [] };
+
+  // N = the greater of the two side-bench sizes (constant across the cascade).
+  const first = rotations[0].serve;
+  const maxBench = Math.max(first.leftBench.length, first.rightBench.length);
+
+  // A rotation is a sit-out only when the libero is off court in both phases.
+  const onCourt = (court: { playerId: string }[]) => court.some((c) => c.playerId === liberoId);
+  const isOut = (i: number) => !onCourt(rotations[i].serve.court) && !onCourt(rotations[i].receive.court);
+
+  if (!isOut(rotationIndex)) return { messages: [] };
+
+  // Count consecutive sit-out rotations ending at this one, walking backwards
+  // and wrapping around the cycle (a full lap means she never plays).
+  const n = rotations.length;
+  let streak = 0;
+  for (let k = 0; k < n; k++) {
+    if (!isOut((rotationIndex - k + n * n) % n)) break;
+    streak++;
+  }
+
+  return streak > maxBench
+    ? { messages: [`Libero can only sit out for ${maxBench} rotation${maxBench === 1 ? '' : 's'}`] }
+    : { messages: [] };
+};
+
 const settings: DeepPartial<LineupSettings> = {
   minGirls: { default: 1, min: 0, autoFulfill: false, editable: false },
-  maxSizePerBench: 2,
   maxRosterSize: 10,
   numLineups: 6,
-  validators: { bench: [benchMinFemales], substitutions: [subsLiberoCourtRule] },
+  validators: { bench: [benchMinFemales, liberoBenchStreak], substitutions: [subsLiberoCourtRule] },
   colors: {
     accentPrimary: '#06A4B4',
     accentSecondary: '#057a86',
   },
+  defaultTheme: 'light',
 }
 
 // Analytics intentionally not wired up yet (will pass onTrack later).
