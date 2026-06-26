@@ -42,55 +42,28 @@ const subsLiberoCourtRule: RotationValidator = (lineup, rotationIndex, phase) =>
   return { messages: ['Must have 2 females on court'] };
 };
 
-// Bench method: when the libero would rotate off the back row it moves to the
-// libero bench and its substitute plays, so the libero "sits out" until brought
-// back. She may sit out at most N consecutive rotations, where N is the larger
-// of the two side benches (the players cycling through court on that side). A
-// rotation only counts as a sit-out when the libero is off court in both its
-// serve and receive formations. Only the offending rotations are flagged: a
-// rotation is invalid when the run of consecutive sit-outs ending at it exceeds
-// N (so the first N out-rotations pass and each one after must have her back).
-// The run is counted backwards, wrapping around the cycle.
+// Both methods: across the full rotation cycle the libero must be on court for
+// exactly 6 rotations. A rotation counts if the libero is on court in its serve,
+// receive, or both phases. The (lineup-wide) violation is surfaced only on the
+// rotations where she is off court.
 //
-// Rotation 1 (index 0) is never flagged - players are configured from there, so
-// flagging it would block edits. The wrap-around streak that would end at it is
-// instead checked when validating the last rotation. (The library only runs
+// Rotation 1 (index 0) is never flagged: players are configured from there (and
+// the library rejects edits that leave the active rotation invalid), and the
+// libero may legitimately start off court at rotation 1. (The library only runs
 // validators on a full court.)
-const liberoBenchStreak: RotationValidator = (lineup, rotationIndex) => {
+const liberoSixRotations: RotationValidator = (lineup, rotationIndex) => {
   const liberoId = Object.values(lineup.roster).find((p) => p.position === 'libero')?.id;
-  const rotations = lineup.rotations;
-  if (!liberoId || rotations.length === 0) return { messages: [] };
+  if (!liberoId) return { messages: [] };
 
-  // N = the greater of the two side-bench sizes (constant across the cascade).
-  const first = rotations[0].serve;
-  const maxBench = Math.max(first.leftBench.length, first.rightBench.length);
-
-  // A rotation is a sit-out only when the libero is off court in both phases.
   const onCourt = (court: { playerId: string }[]) => court.some((c) => c.playerId === liberoId);
-  const isOut = (i: number) => !onCourt(rotations[i].serve.court) && !onCourt(rotations[i].receive.court);
+  const count = lineup.rotations.filter((r) => onCourt(r.serve.court) || onCourt(r.receive.court)).length;
+  if (count === 6) return { messages: [] };
 
-  // Consecutive sit-out rotations ending at index i, walking backwards and
-  // wrapping around the cycle (a full lap means she never plays).
-  const n = rotations.length;
-  const streakEndingAt = (i: number): number => {
-    if (!isOut(i)) return 0;
-    let streak = 0;
-    for (let k = 0; k < n; k++) {
-      if (!isOut((i - k + n * n) % n)) break;
-      streak++;
-    }
-    return streak;
-  };
+  // Only surface the violation on rotations where the libero is off court.
+  const here = lineup.rotations[rotationIndex];
+  if (!here || onCourt(here.serve.court) || onCourt(here.receive.court)) return { messages: [] };
 
-  // Skip rotation 1; on the last rotation, also check rotation 1's wrap-around
-  // streak so the violation still surfaces (just not on rotation 1 itself).
-  const indices: number[] = [];
-  if (rotationIndex !== 0) indices.push(rotationIndex);
-  if (rotationIndex === n - 1 && n > 1) indices.push(0);
-
-  return indices.some((i) => streakEndingAt(i) > maxBench)
-    ? { messages: [`Libero can only sit out for ${maxBench} rotation${maxBench === 1 ? '' : 's'}`] }
-    : { messages: [] };
+  return { messages: ['Libero must play exactly 6 rotations'] };
 };
 
 // Bench method: the libero may only replace at most 2 distinct players over the
@@ -137,8 +110,8 @@ const settings: DeepPartial<LineupSettings> = {
   maxRosterSize: 10,
   numLineups: 6,
   validators: {
-    bench: [benchMinFemales, liberoBenchStreak, liberoMaxReplacements],
-    substitutions: [subsLiberoCourtRule, liberoMaxPositions],
+    bench: [benchMinFemales, liberoSixRotations, liberoMaxReplacements],
+    substitutions: [subsLiberoCourtRule, liberoMaxPositions, liberoSixRotations],
   },
   colors: {
     accentPrimary: '#06A4B4',
