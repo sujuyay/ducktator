@@ -23,20 +23,15 @@ const subsLiberoCourtRule: RotationValidator = (lineup, rotationIndex, phase) =>
   const court = lineup.rotations[rotationIndex]?.[phase]?.court;
   const liberoId = Object.values(lineup.roster).find((p) => p.position === 'libero')?.id;
   const girls = court.filter((c) => lineup.roster[c.playerId]?.gender === 'female').length;
-  const backRow = court.slice(PLAYER_COUNT / 2);
   const liberoOnCourt = !!liberoId && court.some((c) => c.playerId === liberoId);
-
-  if (phase === 'receive') {
-    // On receive the libero must be back on the back row.
-    if (liberoId && !backRow.some((c) => c.playerId === liberoId)) {
-      return { messages: ['Must have 2 females on court'] };
-    }
-    return girls >= 2 ? { messages: [] } : { messages: ['Must have 2 females on court'] };
-  }
-
   // Serve: 2 girls required, unless the libero has already served (in an earlier
   // serve rotation) and has now left the court so another player can serve.
   if (girls >= 2) return { messages: [] };
+
+  if (phase === 'receive' && girls < 2) {
+    return { messages: ['Must have 2 females on court'] };
+  }
+
   const serverIndex = PLAYER_COUNT - 1;
   const liberoHasServed = lineup.rotations
     .slice(0, rotationIndex)
@@ -97,7 +92,7 @@ const liberoBenchStreak: RotationValidator = (lineup, rotationIndex) => {
     : { messages: [] };
 };
 
-// Both methods: the libero may only replace at most 2 distinct players over the
+// Bench method: the libero may only replace at most 2 distinct players over the
 // course of the lineup. The player the libero subs for sits on the libero bench,
 // so the distinct players she has replaced are the unique libero-bench ids that
 // aren't the libero herself (across every rotation/phase).
@@ -114,7 +109,26 @@ const liberoMaxReplacements: RotationValidator = (lineup) => {
     }
   }
 
-  return replaced.size > 2 ? { messages: ['Libero can only replace 2 players'] } : { messages: [] };
+  return replaced.size > 2 ? { messages: ['Libero can only replace 2 positions'] } : { messages: [] };
+};
+
+// Subs method: the libero subs in for a player and takes their rotational
+// position, so the players she replaces are the distinct rotationalPosition
+// values she occupies while on court (across every rotation/phase). Cap at 2.
+const liberoMaxPositions: RotationValidator = (lineup) => {
+  const liberoId = Object.values(lineup.roster).find((p) => p.position === 'libero')?.id;
+  if (!liberoId) return { messages: [] };
+
+  const positions = new Set<number>();
+  for (const r of lineup.rotations) {
+    for (const phase of [r.serve, r.receive]) {
+      for (const c of phase.court) {
+        if (c.playerId === liberoId && c.rotationalPosition !== undefined) positions.add(c.rotationalPosition);
+      }
+    }
+  }
+
+  return positions.size > 2 ? { messages: ['Libero can only replace 2 positions'] } : { messages: [] };
 };
 
 const settings: DeepPartial<LineupSettings> = {
@@ -123,7 +137,7 @@ const settings: DeepPartial<LineupSettings> = {
   numLineups: 6,
   validators: {
     bench: [benchMinFemales, liberoBenchStreak, liberoMaxReplacements],
-    substitutions: [subsLiberoCourtRule, liberoMaxReplacements],
+    substitutions: [subsLiberoCourtRule, liberoMaxPositions],
   },
   colors: {
     accentPrimary: '#06A4B4',
