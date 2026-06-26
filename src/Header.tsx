@@ -1,16 +1,18 @@
 import { useState } from 'react'
+import { Link, useLocation } from 'react-router-dom'
 import './Header.css'
 
 // This app lives on a subdomain (app.ducktatorsports.com), so links point back
-// at the main site absolutely.
+// at the main site absolutely. Items with `to` are in-app routes instead.
 const SITE = 'https://ducktatorsports.com'
 const LOGO = 'https://cdn-app.teamlinkt.com/media/association_data/34093/site_data/images/site_logo.png?v=1768227161'
 
-const NAV = [
-  { label: 'Home', href: `${SITE}/dsv/Home`, current: true },
+const NAV: { label: string; href?: string; to?: string }[] = [
+  { label: 'Home', href: `${SITE}/dsv/Home` },
   { label: 'Schedule', href: `${SITE}/dsv/Schedule` },
   { label: 'Scores', href: `${SITE}/dsv/Scores` },
   { label: 'Standings', href: `${SITE}/dsv/Standings` },
+  { label: 'Lineup', to: '/lineup' },
   { label: 'Contact Us', href: `${SITE}/dsv/ContactUs` },
 ]
 
@@ -36,6 +38,7 @@ function YoutubeIcon() {
 // feels native to the main site (no external theme styles imported).
 export function Header() {
   const [open, setOpen] = useState(false)
+  const { pathname } = useLocation()
 
   return (
     <header className="dsv-header">
@@ -72,13 +75,22 @@ export function Header() {
 
         <nav className={`dsv-nav${open ? ' open' : ''}`}>
           <ul>
-            {NAV.map((item) => (
-              <li key={item.label} className={item.current ? 'current' : ''}>
-                <a href={item.href} onClick={() => setOpen(false)}>
-                  {item.label}
-                </a>
-              </li>
-            ))}
+            {NAV.map((item) => {
+              const current = item.to ? pathname === item.to : false
+              return (
+                <li key={item.label} className={current ? 'current' : ''}>
+                  {item.to ? (
+                    <Link to={item.to} onClick={() => setOpen(false)}>
+                      {item.label}
+                    </Link>
+                  ) : (
+                    <a href={item.href} onClick={() => setOpen(false)}>
+                      {item.label}
+                    </a>
+                  )}
+                </li>
+              )
+            })}
           </ul>
         </nav>
       </div>

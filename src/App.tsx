@@ -1,3 +1,4 @@
+import { Navigate, Route, Routes } from 'react-router-dom'
 import { LineupSimulator, PLAYER_COUNT } from '@jkim430/lineup'
 import type { DeepPartial, LineupSettings, RotationValidator } from '@jkim430/lineup'
 import '@jkim430/lineup/style.css'
@@ -146,13 +147,35 @@ const settings: DeepPartial<LineupSettings> = {
   defaultTheme: 'light',
 }
 
-// Analytics intentionally not wired up yet (will pass onTrack later).
-function App() {
+// Umami's tracking script (loaded in index.html) exposes window.umami once ready.
+declare global {
+  interface Window {
+    umami?: { track: (event: string, data?: Record<string, unknown>) => void }
+  }
+}
+
+// Forward the lineup's analytics events to Umami (no-op until the script loads).
+const track = (event: string, data?: Record<string, unknown>) => {
+  window.umami?.track(event, data)
+}
+
+// The lineup tool, served at /lineup.
+function LineupPage() {
   return (
     <>
       <Header />
-      <LineupSimulator settings={settings} />
+      <LineupSimulator settings={settings} onTrack={track} />
     </>
+  )
+}
+
+function App() {
+  return (
+    <Routes>
+      <Route path="/lineup" element={<LineupPage />} />
+      {/* Anything else (incl. /) redirects to the lineup page for now. */}
+      <Route path="*" element={<Navigate to="/lineup" replace />} />
+    </Routes>
   )
 }
 
