@@ -26,6 +26,10 @@ body:has(.open-gyms-list) {
   color: #1a1f2e;
 }
 
+.open-gyms-error {
+  color: #c0392b;
+}
+
 .open-gyms-table {
   display: flex;
   flex-direction: column;

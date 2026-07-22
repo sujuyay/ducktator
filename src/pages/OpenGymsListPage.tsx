@@ -4,6 +4,7 @@ import { Header } from '../Header'
 import { listOpenGyms, listPastOpenGyms } from '../api/openGyms'
 import type { OpenGymSummary } from '../api/openGyms'
 import { AvailabilityBar } from '../components/AvailabilityBar'
+import { Spinner } from '../components/Spinner'
 import { formatDate } from './openGymFormat'
 import './OpenGymsListPage.css'
 
@@ -19,7 +20,13 @@ function OpenGymsTable({ openGyms }: { openGyms: OpenGymSummary[] }) {
       </div>
 
       {openGyms.map((gym) => (
-        <Link key={gym.date} className="open-gyms-row open-gym-card" to={`/open-gyms/${gym.date}`} role="row">
+        <Link
+          key={gym.date}
+          className="open-gyms-row open-gym-card"
+          to={`/open-gyms/${gym.date}`}
+          state={{ summary: gym }}
+          role="row"
+        >
           <span className="open-gym-card-date">{formatDate(gym.date)}</span>
           <span>
             {gym.start} - {gym.end}
@@ -36,12 +43,17 @@ function OpenGymsTable({ openGyms }: { openGyms: OpenGymSummary[] }) {
 export function OpenGymsListPage() {
   const [upcoming, setUpcoming] = useState<OpenGymSummary[] | null>(null)
   const [past, setPast] = useState<OpenGymSummary[] | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
-    listOpenGyms().then((gyms) => {
-      if (!cancelled) setUpcoming(gyms)
-    })
+    listOpenGyms()
+      .then((gyms) => {
+        if (!cancelled) setUpcoming(gyms)
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load open gyms.')
+      })
     listPastOpenGyms().then((gyms) => {
       if (!cancelled) setPast(gyms)
     })
@@ -56,9 +68,10 @@ export function OpenGymsListPage() {
       <main className="open-gyms-list">
         <h1>Open Gyms</h1>
 
-        {upcoming === null && <p>Loading...</p>}
-        {upcoming?.length === 0 && <p>No upcoming open gyms right now - check back soon.</p>}
-        {upcoming && upcoming.length > 0 && <OpenGymsTable openGyms={upcoming} />}
+        {error && <p className="open-gyms-error">{error}</p>}
+        {!error && upcoming === null && <Spinner />}
+        {!error && upcoming?.length === 0 && <p>No upcoming open gyms right now - check back soon.</p>}
+        {!error && upcoming && upcoming.length > 0 && <OpenGymsTable openGyms={upcoming} />}
 
         {past && past.length > 0 && (
           <>

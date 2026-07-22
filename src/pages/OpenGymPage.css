@@ -32,6 +32,10 @@ body:has(.open-gym-page) {
   text-decoration: underline;
 }
 
+.open-gym-error {
+  color: #c0392b;
+}
+
 .open-gym-info {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));

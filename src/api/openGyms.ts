@@ -1,9 +1,8 @@
-// Data-access layer for open gyms. Backed by an in-memory mock for now; the
-// real "database" is a Google Drive folder of Sheets (one sheet per open gym,
-// named after its date, with "Signups" and "Details" tabs - see
-// scripts/apps-script.gs). Once that Apps Script Web App is deployed, swap the
-// bodies of these functions for `fetch(APPS_SCRIPT_URL, ...)` calls - the
-// signatures and shapes below are already modeled on what it will return.
+// Data-access layer for open gyms, backed by the Google Apps Script Web App
+// defined in scripts/apps-script.gs. That script reads/writes a Google Drive
+// folder of Sheets (one sheet per open gym, named after its date, with
+// "Details", "Signups", and "Waitlist" tabs) and is deployed separately from
+// this site - see scripts/apps-script.gs's header comment for deploy steps.
 
 export type Position = 'Setter' | 'Middle' | 'Outside' | 'Opposite' | 'Flex'
 
@@ -71,210 +70,48 @@ export interface WaitlistInput {
   waiverCompleted: boolean
 }
 
-interface MockOpenGym {
-  date: string
-  start: string
-  end: string
-  location: string
-  price: string
-  slots: Record<Position, number>
-  signups: Signup[]
-  waitlist: WaitlistEntry[]
+const APPS_SCRIPT_URL = import.meta.env.VITE_APPS_SCRIPT_URL
+
+function requireUrl(): string {
+  if (!APPS_SCRIPT_URL) {
+    throw new Error(
+      'VITE_APPS_SCRIPT_URL is not set. Deploy scripts/apps-script.gs as a Web App and set the URL in .env.local.',
+    )
+  }
+  return APPS_SCRIPT_URL
 }
 
-const MOCK_OPEN_GYMS: MockOpenGym[] = [
-  {
-    date: '2026-08-01',
-    start: '8:00 PM',
-    end: '10:00 PM',
-    location: 'Ducktator Sports Complex - Court 1',
-    price: '$15',
-    slots: { Setter: 2, Middle: 4, Outside: 4, Opposite: 2, Flex: 4 },
-    signups: [
-      {
-        timestamp: '2026-07-20T14:32:00Z',
-        firstName: 'Jamie',
-        lastName: 'Lee',
-        phoneNumber: '555-010-1234',
-        groupName: 'The Spikers',
-        team: 'Team A',
-        position: 'Outside',
-        waiverCompleted: true,
-        paid: true,
-      },
-      {
-        timestamp: '2026-07-19T09:10:00Z',
-        firstName: 'Sam',
-        lastName: 'Rivera',
-        phoneNumber: '555-010-5678',
-        groupName: 'The Spikers',
-        team: 'Team A',
-        position: 'Setter',
-        waiverCompleted: true,
-        paid: true,
-      },
-      {
-        timestamp: '2026-07-18T20:05:00Z',
-        firstName: 'Taylor',
-        lastName: 'Kim',
-        phoneNumber: '555-010-9012',
-        groupName: '',
-        team: 'Team B',
-        position: 'Middle',
-        waiverCompleted: true,
-        paid: true,
-      },
-      {
-        timestamp: '2026-07-17T20:05:00Z',
-        firstName: 'Casey',
-        lastName: 'Nguyen',
-        phoneNumber: '555-010-3456',
-        groupName: '',
-        team: '',
-        position: 'Flex',
-        waiverCompleted: true,
-        paid: false,
-      },
-    ],
-    waitlist: [
-      {
-        timestamp: '2026-07-21T10:00:00Z',
-        firstName: 'Drew',
-        lastName: 'Nakamura',
-        phoneNumber: '555-010-6543',
-        groupName: '',
-        waiverCompleted: true,
-      },
-    ],
-  },
-  {
-    date: '2026-08-08',
-    start: '8:00 PM',
-    end: '10:00 PM',
-    location: 'Ducktator Sports Complex - Court 1',
-    price: '$15',
-    slots: { Setter: 1, Middle: 1, Outside: 1, Opposite: 1, Flex: 1 },
-    signups: [
-      {
-        timestamp: '2026-07-22T12:00:00Z',
-        firstName: 'Alex',
-        lastName: 'Torres',
-        phoneNumber: '555-010-1111',
-        groupName: '',
-        team: '',
-        position: 'Setter',
-        waiverCompleted: true,
-        paid: true,
-      },
-      {
-        timestamp: '2026-07-22T12:05:00Z',
-        firstName: 'Jordan',
-        lastName: 'Blake',
-        phoneNumber: '555-010-2222',
-        groupName: '',
-        team: '',
-        position: 'Middle',
-        waiverCompleted: true,
-        paid: true,
-      },
-      {
-        timestamp: '2026-07-22T12:10:00Z',
-        firstName: 'Sydney',
-        lastName: 'Park',
-        phoneNumber: '555-010-3333',
-        groupName: '',
-        team: '',
-        position: 'Outside',
-        waiverCompleted: true,
-        paid: true,
-      },
-      {
-        timestamp: '2026-07-22T12:15:00Z',
-        firstName: 'Cameron',
-        lastName: 'Diaz',
-        phoneNumber: '555-010-4444',
-        groupName: '',
-        team: '',
-        position: 'Opposite',
-        waiverCompleted: true,
-        paid: true,
-      },
-      {
-        timestamp: '2026-07-22T12:20:00Z',
-        firstName: 'Reese',
-        lastName: 'Nolan',
-        phoneNumber: '555-010-5555',
-        groupName: '',
-        team: '',
-        position: 'Flex',
-        waiverCompleted: true,
-        paid: true,
-      },
-    ],
-    waitlist: [
-      {
-        timestamp: '2026-07-22T13:00:00Z',
-        firstName: 'Harper',
-        lastName: 'Quinn',
-        phoneNumber: '555-010-6666',
-        groupName: '',
-        waiverCompleted: true,
-      },
-      {
-        timestamp: '2026-07-22T13:30:00Z',
-        firstName: 'Skyler',
-        lastName: 'Reed',
-        phoneNumber: '555-010-7777',
-        groupName: '',
-        waiverCompleted: true,
-      },
-    ],
-  },
-  {
-    date: '2026-07-25',
-    start: '7:00 PM',
-    end: '9:00 PM',
-    location: 'Ducktator Sports Complex - Court 2',
-    price: '$10',
-    slots: { Setter: 2, Middle: 4, Outside: 4, Opposite: 2, Flex: 4 },
-    signups: [
-      {
-        timestamp: '2026-07-15T11:00:00Z',
-        firstName: 'Morgan',
-        lastName: 'Patel',
-        phoneNumber: '555-010-7890',
-        groupName: 'Net Gains',
-        team: '',
-        position: 'Middle',
-        waiverCompleted: true,
-        paid: true,
-      },
-    ],
-    waitlist: [],
-  },
-  {
-    date: '2026-07-10',
-    start: '8:00 PM',
-    end: '10:00 PM',
-    location: 'Ducktator Sports Complex - Court 1',
-    price: '$15',
-    slots: { Setter: 2, Middle: 4, Outside: 4, Opposite: 2, Flex: 4 },
-    signups: [
-      {
-        timestamp: '2026-07-01T18:00:00Z',
-        firstName: 'Riley',
-        lastName: 'Chen',
-        phoneNumber: '555-010-2345',
-        groupName: 'Net Gains',
-        team: '',
-        position: 'Opposite',
-        waiverCompleted: true,
-        paid: true,
-      },
-    ],
-    waitlist: [],
-  },
-]
+interface ErrorResponse {
+  error: string
+}
+
+const isErrorResponse = (data: unknown): data is ErrorResponse =>
+  typeof data === 'object' && data !== null && typeof (data as ErrorResponse).error === 'string'
+
+async function get<T>(params: Record<string, string>): Promise<T> {
+  const url = new URL(requireUrl())
+  for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value)
+
+  const response = await fetch(url.toString())
+  const data = await response.json()
+  if (isErrorResponse(data)) throw new Error(data.error)
+  return data as T
+}
+
+// Sent as text/plain (not application/json) so the browser doesn't preflight
+// the request with an OPTIONS call - Apps Script Web Apps don't implement
+// doOptions, so a preflighted request would fail outright. doPost still
+// parses the body as JSON regardless of the declared content type.
+async function post<T>(body: unknown): Promise<T> {
+  const response = await fetch(requireUrl(), {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(body),
+  })
+  const data = await response.json()
+  if (isErrorResponse(data)) throw new Error(data.error)
+  return data as T
+}
 
 // Open gym dates/times are always in US Eastern time (observing DST, i.e.
 // EST/EDT as a wall clock in America/New_York would show).
@@ -317,102 +154,51 @@ function parseEasternDateTime(date: string, time: string): Date {
 // An open gym is "in the future" (and available to sign up for) until it ends.
 export const isOpenGymPast = (date: string, end: string) => parseEasternDateTime(date, end).getTime() <= Date.now()
 
-const isFuture = (gym: MockOpenGym) => !isOpenGymPast(gym.date, gym.end)
+// Module-level cache, shared by every page for the lifetime of the SPA (this
+// module is only ever loaded once, so navigating between routes doesn't
+// re-import it). Caches in-flight promises, not just resolved values, so
+// concurrent callers (e.g. React StrictMode's double effect) share one
+// request instead of firing two.
+let openGymsCache: Promise<OpenGymSummary[]> | null = null
+let pastOpenGymsCache: Promise<OpenGymSummary[]> | null = null
+const openGymDetailCache = new Map<string, Promise<OpenGymDetail | undefined>>()
 
-const isWithinPastMonth = (gym: MockOpenGym) => {
-  const end = parseEasternDateTime(gym.date, gym.end).getTime()
-  const cutoff = new Date()
-  cutoff.setMonth(cutoff.getMonth() - 1)
-  return end <= Date.now() && end >= cutoff.getTime()
-}
-
-const paidFilled = (gym: MockOpenGym, position: Position) =>
-  gym.signups.filter((s) => s.paid && s.position === position).length
-
-const toSummary = (gym: MockOpenGym): OpenGymSummary => {
-  const spotsAvailable = POSITIONS.reduce((sum, p) => sum + gym.slots[p], 0)
-  const spotsFilled = POSITIONS.reduce((sum, p) => sum + paidFilled(gym, p), 0)
-  return {
-    date: gym.date,
-    start: gym.start,
-    end: gym.end,
-    location: gym.location,
-    price: gym.price,
-    spotsFilled,
-    spotsAvailable,
-    waitlistCount: gym.waitlist.length,
-  }
-}
-
-const toDetail = (gym: MockOpenGym): OpenGymDetail => {
-  const positions: PositionSlots[] = POSITIONS.map((position) => ({
-    position,
-    available: gym.slots[position],
-    filled: paidFilled(gym, position),
-  }))
-
-  const groupNames = [...new Set(gym.signups.map((s) => s.groupName).filter(Boolean))].sort()
-
-  const signups = gym.signups
-    .filter((s) => s.paid)
-    .slice()
-    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-
-  const waitlist = gym.waitlist
-    .slice()
-    .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
-
-  return { ...toSummary(gym), positions, groupNames, signups, waitlist }
+function invalidateCaches(date: string) {
+  openGymsCache = null
+  pastOpenGymsCache = null
+  openGymDetailCache.delete(date)
 }
 
 export async function listOpenGyms(): Promise<OpenGymSummary[]> {
-  return MOCK_OPEN_GYMS.filter(isFuture)
-    .map(toSummary)
-    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+  openGymsCache ??= get<OpenGymSummary[]>({ action: 'list' })
+  return openGymsCache
 }
 
 export async function listPastOpenGyms(): Promise<OpenGymSummary[]> {
-  return MOCK_OPEN_GYMS.filter(isWithinPastMonth)
-    .map(toSummary)
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+  pastOpenGymsCache ??= get<OpenGymSummary[]>({ action: 'list-past' })
+  return pastOpenGymsCache
 }
 
 export async function getOpenGym(date: string): Promise<OpenGymDetail | undefined> {
-  const gym = MOCK_OPEN_GYMS.find((g) => g.date === date)
-  return gym ? toDetail(gym) : undefined
+  let cached = openGymDetailCache.get(date)
+  if (!cached) {
+    cached = get<OpenGymDetail>({ action: 'get', date }).catch((err: unknown) => {
+      if (err instanceof Error && err.message === 'Not found') return undefined
+      throw err
+    })
+    openGymDetailCache.set(date, cached)
+  }
+  return cached
 }
 
 export async function createSignup(date: string, input: SignupInput): Promise<Signup> {
-  const gym = MOCK_OPEN_GYMS.find((g) => g.date === date)
-  if (!gym) throw new Error(`Open gym ${date} not found`)
-
-  const signup: Signup = {
-    timestamp: new Date().toISOString(),
-    firstName: input.firstName,
-    lastName: input.lastName,
-    phoneNumber: input.phoneNumber,
-    groupName: input.groupName,
-    team: '',
-    position: input.position,
-    waiverCompleted: input.waiverCompleted,
-    paid: false,
-  }
-  gym.signups.push(signup)
+  const signup = await post<Signup>({ date, ...input })
+  invalidateCaches(date)
   return signup
 }
 
 export async function joinWaitlist(date: string, input: WaitlistInput): Promise<WaitlistEntry> {
-  const gym = MOCK_OPEN_GYMS.find((g) => g.date === date)
-  if (!gym) throw new Error(`Open gym ${date} not found`)
-
-  const entry: WaitlistEntry = {
-    timestamp: new Date().toISOString(),
-    firstName: input.firstName,
-    lastName: input.lastName,
-    phoneNumber: input.phoneNumber,
-    groupName: input.groupName,
-    waiverCompleted: input.waiverCompleted,
-  }
-  gym.waitlist.push(entry)
+  const entry = await post<WaitlistEntry>({ date, type: 'waitlist', ...input })
+  invalidateCaches(date)
   return entry
 }

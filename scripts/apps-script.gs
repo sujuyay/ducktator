@@ -11,7 +11,7 @@
  *   Details: header row + one data row with
  *     Start | End | Location | Price | Setter | Middle | Outside | Opposite | Flex
  *   Signups: header row + one row per signup with
- *     Timestamp | First Name | Last Name | Phone Number | Group Name | Team | Position | Waiver Completed | Paid
+ *     Timestamp | First Name | Last Name | Phone Number | Group Name | Position | Waiver Completed | Paid | Team
  *   Waitlist: header row + one row per waitlist entry with
  *     Timestamp | First Name | Last Name | Phone Number | Group Name | Waiver Completed
  *   (Signups' Team is filled in manually after the fact - blank until then.)
@@ -24,7 +24,7 @@
  *   POST { date, type: 'waitlist', firstName, lastName, phoneNumber, groupName, waiverCompleted } -> WaitlistEntry
  */
 
-const FOLDER_ID = 'REPLACE_WITH_DRIVE_FOLDER_ID'
+const FOLDER_ID = '1kbNaRSl4JfKQw1ch9pU2wE8zk3Upaq32'
 const POSITIONS = ['Setter', 'Middle', 'Outside', 'Opposite', 'Flex']
 
 function doGet(e) {
@@ -55,15 +55,32 @@ function openGymSheets() {
   return sheets
 }
 
+// Sheets stores a cell formatted as a time-of-day as a Date on the
+// 1899-12-30 epoch. getValues() hands that back as a real Date object, so it
+// has to be reformatted into "h:mm AM/PM" - if the cell was entered as plain
+// text instead, the value is already a string and is returned as-is.
+function formatTime(value) {
+  if (!(value instanceof Date)) return String(value).trim()
+  return Utilities.formatDate(value, 'America/New_York', 'h:mm a')
+}
+
+// Currency-formatted cells still hand back a bare number from getValues() -
+// the "$" is only display formatting, not part of the value - so a numeric
+// price gets "$" prepended. A cell already entered as text (e.g. "$17.50")
+// is left as-is.
+function formatPrice(value) {
+  return typeof value === 'number' ? `$${value}` : String(value).trim()
+}
+
 function readDetails(spreadsheet) {
   const sheet = spreadsheet.getSheetByName('Details')
   const [, row] = sheet.getDataRange().getValues()
   const [start, end, location, price, setter, middle, outside, opposite, flex] = row
   return {
-    start,
-    end,
+    start: formatTime(start),
+    end: formatTime(end),
     location,
-    price: String(price),
+    price: formatPrice(price),
     slots: { Setter: setter, Middle: middle, Outside: outside, Opposite: opposite, Flex: flex },
   }
 }
@@ -73,7 +90,7 @@ function readSignups(spreadsheet) {
   const [, ...rows] = sheet.getDataRange().getValues()
   return rows
     .filter((r) => r[1])
-    .map(([timestamp, firstName, lastName, phoneNumber, groupName, team, position, waiverCompleted, paid]) => ({
+    .map(([timestamp, firstName, lastName, phoneNumber, groupName, position, waiverCompleted, paid, team]) => ({
       timestamp: new Date(timestamp).toISOString(),
       firstName,
       lastName,
@@ -146,35 +163,54 @@ function addSignup(date, input) {
   const spreadsheet = openGymSheets().find((ss) => ss.getName() === date)
   if (!spreadsheet) return { error: 'Not found' }
 
+  const timestamp = new Date()
   const sheet = spreadsheet.getSheetByName('Signups')
   sheet.appendRow([
-    new Date(),
+    timestamp,
     input.firstName,
     input.lastName,
     input.phoneNumber || '',
     input.groupName || '',
-    '', // Team - filled in manually later
     input.position,
     input.waiverCompleted ? 'Y' : 'N',
     'N',
+    '', // Team - filled in manually later
   ])
-  return { ok: true }
+  return {
+    timestamp: timestamp.toISOString(),
+    firstName: input.firstName,
+    lastName: input.lastName,
+    phoneNumber: input.phoneNumber || '',
+    groupName: input.groupName || '',
+    team: '',
+    position: input.position,
+    waiverCompleted: !!input.waiverCompleted,
+    paid: false,
+  }
 }
 
 function addWaitlistEntry(date, input) {
   const spreadsheet = openGymSheets().find((ss) => ss.getName() === date)
   if (!spreadsheet) return { error: 'Not found' }
 
+  const timestamp = new Date()
   const sheet = spreadsheet.getSheetByName('Waitlist')
   sheet.appendRow([
-    new Date(),
+    timestamp,
     input.firstName,
     input.lastName,
     input.phoneNumber || '',
     input.groupName || '',
     input.waiverCompleted ? 'Y' : 'N',
   ])
-  return { ok: true }
+  return {
+    timestamp: timestamp.toISOString(),
+    firstName: input.firstName,
+    lastName: input.lastName,
+    phoneNumber: input.phoneNumber || '',
+    groupName: input.groupName || '',
+    waiverCompleted: !!input.waiverCompleted,
+  }
 }
 
 // Mirrors src/api/openGyms.ts's isOpenGymPast - dates/times are Eastern.
