@@ -8,6 +8,7 @@ body:has(.open-gyms-list) {
 
 .open-gyms-list {
   min-height: calc(100vh - 160px);
+  min-height: calc(100dvh - 160px);
   max-width: 1000px;
   margin: 0 auto;
   padding: 2rem 1.5rem 4rem;
