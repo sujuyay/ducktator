@@ -12,6 +12,7 @@ const NAV: { label: string; href?: string; to?: string }[] = [
   { label: 'Schedule', href: `${SITE}/dsv/Schedule` },
   { label: 'Scores', href: `${SITE}/dsv/Scores` },
   { label: 'Standings', href: `${SITE}/dsv/Standings` },
+  { label: 'Registration', href: 'https://app.teamlinkt.com/register/find/dsv' },
   { label: 'Lineup', to: '/lineup' },
   { label: 'Open Gyms', to: '/open-gyms' },
   { label: 'Contact Us', href: `${SITE}/dsv/ContactUs` },
