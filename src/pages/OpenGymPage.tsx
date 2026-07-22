@@ -1,0 +1,241 @@
+import { useCallback, useEffect, useState } from 'react'
+import { Link, useParams } from 'react-router-dom'
+import { Header } from '../Header'
+import { createSignup, getOpenGym, isOpenGymPast, joinWaitlist } from '../api/openGyms'
+import type { OpenGymDetail, Signup, SignupInput, WaitlistEntry, WaitlistInput } from '../api/openGyms'
+import { SignupModal } from '../components/SignupModal'
+import { POSITION_ABBREVIATIONS, POSITION_COLORS } from '../positionColors'
+import { formatDate } from './openGymFormat'
+import './OpenGymPage.css'
+
+interface TeamGroup {
+  team: string
+  signups: Signup[]
+}
+
+// Signups without a team (not yet assigned manually) render as a flat list,
+// same as before teams existed. Teamed groups appear first, in the order
+// their first (most recent) signup appears.
+function groupByTeam(signups: Signup[]): { teams: TeamGroup[]; ungrouped: Signup[] } {
+  const teams: TeamGroup[] = []
+  const byTeam = new Map<string, Signup[]>()
+  const ungrouped: Signup[] = []
+
+  for (const signup of signups) {
+    if (!signup.team) {
+      ungrouped.push(signup)
+      continue
+    }
+    let group = byTeam.get(signup.team)
+    if (!group) {
+      group = []
+      byTeam.set(signup.team, group)
+      teams.push({ team: signup.team, signups: group })
+    }
+    group.push(signup)
+  }
+
+  return { teams, ungrouped }
+}
+
+function SignupRow({ signup }: { signup: Signup }) {
+  return (
+    <li>
+      <span className="open-gym-signup-name">
+        <span>
+          {signup.firstName} {signup.lastName}
+        </span>
+        {signup.groupName && <span className="open-gym-signup-group">{signup.groupName}</span>}
+      </span>
+      <span className="open-gym-signup-position" style={{ background: POSITION_COLORS[signup.position] }}>
+        {POSITION_ABBREVIATIONS[signup.position]}
+      </span>
+    </li>
+  )
+}
+
+function WaitlistRow({ entry }: { entry: WaitlistEntry }) {
+  return (
+    <li>
+      <span className="open-gym-signup-name">
+        <span>
+          {entry.firstName} {entry.lastName}
+        </span>
+        {entry.groupName && <span className="open-gym-signup-group">{entry.groupName}</span>}
+      </span>
+    </li>
+  )
+}
+
+export function OpenGymPage() {
+  const { date } = useParams<{ date: string }>()
+  const [openGym, setOpenGym] = useState<OpenGymDetail | null | undefined>(null)
+  const [showModal, setShowModal] = useState(false)
+  const [modalMode, setModalMode] = useState<'signup' | 'waitlist'>('signup')
+  const [toastMessage, setToastMessage] = useState<string | null>(null)
+
+  const refresh = useCallback(() => {
+    if (!date) return
+    getOpenGym(date).then((gym) => setOpenGym(gym ?? undefined))
+  }, [date])
+
+  useEffect(() => {
+    refresh()
+  }, [refresh])
+
+  useEffect(() => {
+    if (!toastMessage) return
+    const timer = setTimeout(() => setToastMessage(null), 3000)
+    return () => clearTimeout(timer)
+  }, [toastMessage])
+
+  if (openGym === null) {
+    return (
+      <>
+        <Header />
+        <main className="open-gym-page">
+          <p>Loading...</p>
+        </main>
+      </>
+    )
+  }
+
+  if (openGym === undefined) {
+    return (
+      <>
+        <Header />
+        <main className="open-gym-page">
+          <p>Open gym not found.</p>
+          <Link to="/open-gyms">{'<'} Back to open gyms</Link>
+        </main>
+      </>
+    )
+  }
+
+  const past = isOpenGymPast(openGym.date, openGym.end)
+  const full = openGym.positions.every((p) => p.filled >= p.available)
+
+  const handleSubmit = async (input: SignupInput | WaitlistInput) => {
+    if (modalMode === 'waitlist') {
+      await joinWaitlist(openGym.date, input as WaitlistInput)
+      setToastMessage('Joined waitlist!')
+    } else {
+      await createSignup(openGym.date, input as SignupInput)
+      setToastMessage('Submitted! Make payment to confirm your spot.')
+    }
+    setShowModal(false)
+    refresh()
+  }
+
+  return (
+    <>
+      <Header />
+      <main className="open-gym-page">
+        <Link className="open-gym-back" to="/open-gyms">
+          {'<'} Back to open gyms
+        </Link>
+
+        <h1>{formatDate(openGym.date)}</h1>
+
+        <dl className="open-gym-info">
+          <div>
+            <dt>Time</dt>
+            <dd>
+              {openGym.start} - {openGym.end}
+            </dd>
+          </div>
+          <div>
+            <dt>Location</dt>
+            <dd>{openGym.location}</dd>
+          </div>
+          <div>
+            <dt>Price</dt>
+            <dd>{openGym.price}</dd>
+          </div>
+          <div>
+            <dt>Spots</dt>
+            <dd>
+              {openGym.spotsFilled}/{openGym.spotsAvailable} filled
+              {openGym.waitlist.length > 0 && ` (${openGym.waitlist.length} waitlist)`}
+            </dd>
+          </div>
+        </dl>
+
+        <div className="open-gym-signups-header">
+          <h2>Players</h2>
+          {!past && <button
+            type="button"
+            className="open-gym-signup-button"
+            onClick={() => {
+              setModalMode(full ? 'waitlist' : 'signup')
+              setShowModal(true)
+            }}
+          >
+            {full ? 'Join Waitlist' : 'Sign Up'}
+          </button>}
+        </div>
+        <p className="open-gym-signups-subtext">
+          To cancel your spot, email <a href="mailto:ducktatorsports@gmail.com">ducktatorsports@gmail.com</a>
+        </p>
+
+        {openGym.signups.length === 0 ? (
+          <p>No signups yet.</p>
+        ) : (
+          (() => {
+            const { teams, ungrouped } = groupByTeam(openGym.signups)
+            return (
+              <>
+                {teams.map((group) => (
+                  <div key={group.team} className="open-gym-team-group">
+                    <h3>{group.team}</h3>
+                    <ul className="open-gym-signups">
+                      {group.signups.map((signup, i) => (
+                        <SignupRow key={i} signup={signup} />
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+
+                {ungrouped.length > 0 && (
+                  <ul className="open-gym-signups">
+                    {ungrouped.map((signup, i) => (
+                      <SignupRow key={i} signup={signup} />
+                    ))}
+                  </ul>
+                )}
+              </>
+            )
+          })()
+        )}
+
+        {openGym.waitlist.length > 0 && (
+          <>
+            <h2 className="open-gym-waitlist-heading">Waitlist</h2>
+            <ul className="open-gym-signups">
+              {openGym.waitlist.map((entry, i) => (
+                <WaitlistRow key={i} entry={entry} />
+              ))}
+            </ul>
+          </>
+        )}
+
+        {showModal && (
+          <SignupModal
+            groupNames={openGym.groupNames}
+            positions={openGym.positions}
+            price={openGym.price}
+            waitlist={modalMode === 'waitlist'}
+            onCancel={() => setShowModal(false)}
+            onSubmit={handleSubmit}
+          />
+        )}
+
+        {toastMessage && (
+          <div className="open-gym-toast" role="status">
+            {toastMessage}
+          </div>
+        )}
+      </main>
+    </>
+  )
+}

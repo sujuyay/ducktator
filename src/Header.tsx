@@ -13,6 +13,7 @@ const NAV: { label: string; href?: string; to?: string }[] = [
   { label: 'Scores', href: `${SITE}/dsv/Scores` },
   { label: 'Standings', href: `${SITE}/dsv/Standings` },
   { label: 'Lineup', to: '/lineup' },
+  { label: 'Open Gyms', to: '/open-gyms' },
   { label: 'Contact Us', href: `${SITE}/dsv/ContactUs` },
 ]
 
@@ -76,7 +77,7 @@ export function Header() {
         <nav className={`dsv-nav${open ? ' open' : ''}`}>
           <ul>
             {NAV.map((item) => {
-              const current = item.to ? pathname === item.to : false
+              const current = item.to ? pathname === item.to || pathname.startsWith(`${item.to}/`) : false
               return (
                 <li key={item.label} className={current ? 'current' : ''}>
                   {item.to ? (

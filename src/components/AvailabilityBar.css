@@ -1,0 +1,42 @@
+.availability {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 140px;
+}
+
+.availability-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #4a5a63;
+}
+
+.availability-track {
+  width: 100%;
+  height: 8px;
+  border-radius: 4px;
+  background: #e3e8ea;
+  overflow: hidden;
+}
+
+.availability-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.2s ease;
+}
+
+.availability-fill-low {
+  background: #2fb872;
+}
+
+.availability-fill-medium {
+  background: #e8b800;
+}
+
+.availability-fill-high {
+  background: #e64d4d;
+}
+
+.availability-fill-full {
+  background: #06a4b4;
+}

@@ -1,0 +1,80 @@
+/* The lineup library paints `body` with its own theme-driven --bg-primary
+   variable globally. Override it back to a fixed light gray while this page
+   is mounted, scoped via :has() so it doesn't leak onto the Lineup page. */
+body:has(.open-gyms-list) {
+  background: #f4f6f8;
+  color: #1a1f2e;
+}
+
+.open-gyms-list {
+  min-height: calc(100vh - 160px);
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem 4rem;
+  background: #f4f6f8;
+  color: #1a1f2e;
+  font-family: Nunito, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, system-ui, sans-serif;
+}
+
+.open-gyms-list h1 {
+  margin-bottom: 1.5rem;
+  color: #1a1f2e;
+}
+
+.open-gyms-section-heading {
+  margin: 2.5rem 0 1rem;
+  color: #1a1f2e;
+}
+
+.open-gyms-table {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.open-gyms-row {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1.6fr 0.7fr 1.2fr;
+  align-items: center;
+  gap: 1rem;
+  padding: 0 1.25rem;
+}
+
+.open-gyms-header {
+  padding: 0 1.25rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #5b6b73;
+}
+
+.open-gym-card {
+  padding: 1rem 1.25rem;
+  border-radius: 10px;
+  border: 1px solid #dfe4e7;
+  background: #ffffff;
+  color: #1a1f2e;
+  text-decoration: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.open-gym-card:hover {
+  border-color: #06a4b4;
+  box-shadow: 0 2px 10px rgba(6, 164, 180, 0.15);
+}
+
+.open-gym-card-date {
+  font-weight: 700;
+}
+
+@media (max-width: 720px) {
+  .open-gyms-row {
+    grid-template-columns: 1fr;
+    gap: 0.35rem;
+  }
+
+  .open-gyms-header {
+    display: none;
+  }
+}

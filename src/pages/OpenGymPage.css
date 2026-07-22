@@ -1,0 +1,173 @@
+/* The lineup library paints `body` with its own theme-driven --bg-primary
+   variable globally. Override it back to a fixed light gray while this page
+   is mounted, scoped via :has() so it doesn't leak onto the Lineup page. */
+body:has(.open-gym-page) {
+  background: #f4f6f8;
+  color: #1a1f2e;
+}
+
+.open-gym-page {
+  min-height: calc(100vh - 160px);
+  max-width: 700px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem 4rem;
+  background: #f4f6f8;
+  color: #1a1f2e;
+  font-family: Nunito, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, system-ui, sans-serif;
+}
+
+.open-gym-page h1,
+.open-gym-page h2 {
+  color: #1a1f2e;
+}
+
+.open-gym-back {
+  display: inline-block;
+  margin-bottom: 1rem;
+  color: #06a4b4;
+  text-decoration: none;
+}
+
+.open-gym-back:hover {
+  text-decoration: underline;
+}
+
+.open-gym-info {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 1rem;
+  margin: 1.5rem 0;
+  padding: 1rem 1.25rem;
+  border-radius: 10px;
+  border: 1px solid #dfe4e7;
+  background: #ffffff;
+}
+
+.open-gym-info dt {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #5b6b73;
+}
+
+.open-gym-info dd {
+  margin: 0.2rem 0 0;
+  font-weight: 700;
+}
+
+.open-gym-signups-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.open-gym-signups-header h2 {
+  margin: 0;
+}
+
+.open-gym-signups-subtext {
+  margin: 0.35rem 0 0;
+  font-size: 0.8rem;
+  color: #5b6b73;
+}
+
+.open-gym-signups-subtext a {
+  color: #06a4b4;
+  font-weight: 600;
+}
+
+.open-gym-signup-button {
+  padding: 0.7rem 1.5rem;
+  border: none;
+  border-radius: 8px;
+  background: #06a4b4;
+  color: #fff;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.open-gym-signup-button:disabled {
+  background: #d3d9db;
+  color: #8a9499;
+  cursor: not-allowed;
+}
+
+.open-gym-waitlist-heading {
+  margin: 2rem 0 1rem;
+}
+
+.open-gym-team-group {
+  margin-top: 1.25rem;
+}
+
+.open-gym-team-group h3 {
+  margin: 0 0 0.5rem;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #5b6b73;
+}
+
+.open-gym-signups {
+  list-style: none;
+  margin: 1rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.open-gym-team-group .open-gym-signups {
+  margin-top: 0;
+}
+
+.open-gym-signups li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.4rem 0.85rem;
+  border-radius: 8px;
+  border: 1px solid #dfe4e7;
+  background: #ffffff;
+  font-size: 0.9rem;
+}
+
+.open-gym-signup-name {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.open-gym-signup-group {
+  font-size: 0.75rem;
+  color: #5b6b73;
+  font-weight: 400;
+}
+
+.open-gym-signup-position {
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.open-gym-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 2rem;
+  transform: translateX(-50%);
+  z-index: 1100;
+  width: min(90vw, 480px);
+  padding: .75rem;
+  border-radius: 8px;
+  background: #e6f6ea;
+  border: 1px solid #a8dfb5;
+  color: #216b3a;
+  font-weight: 600;
+  font-size: 0.85rem;
+  text-align: center;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.15);
+}
