@@ -3,6 +3,7 @@ import './AvailabilityBar.css'
 interface AvailabilityBarProps {
   filled: number
   available: number
+  pendingCount?: number
   waitlistCount?: number
 }
 
@@ -15,14 +16,18 @@ function fillLevel(ratio: number): 'low' | 'medium' | 'high' | 'full' {
   return 'low'
 }
 
-export function AvailabilityBar({ filled, available, waitlistCount = 0 }: AvailabilityBarProps) {
+export function AvailabilityBar({ filled, available, pendingCount = 0, waitlistCount = 0 }: AvailabilityBarProps) {
   const ratio = available > 0 ? filled / available : 0
   const level = fillLevel(ratio)
 
   return (
     <div className="availability">
       <div className="availability-label">
-        {filled}/{available} spots filled{waitlistCount > 0 && ` (${waitlistCount} waitlist)`}
+        {filled}/{available} spots filled
+        {(pendingCount > 0 || waitlistCount > 0) &&
+          ` (${[pendingCount > 0 && `${pendingCount} pending`, waitlistCount > 0 && `${waitlistCount} waitlist`]
+            .filter(Boolean)
+            .join(', ')})`}
       </div>
       <div className="availability-track">
         <div

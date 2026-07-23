@@ -55,6 +55,14 @@ function SignupRow({ signup }: { signup: Signup }) {
   )
 }
 
+// Once the gym is full, a pending (unpaid) signup is functionally waiting
+// for a spot just like a waitlist entry - render it the same way, dropping
+// the position it originally requested.
+function signupAsWaitlistEntry(signup: Signup): WaitlistEntry {
+  const { timestamp, firstName, lastName, phoneNumber, groupName, waiverCompleted } = signup
+  return { timestamp, firstName, lastName, phoneNumber, groupName, waiverCompleted }
+}
+
 function WaitlistRow({ entry }: { entry: WaitlistEntry }) {
   return (
     <li>
@@ -183,7 +191,13 @@ export function OpenGymPage() {
             <dt>Spots</dt>
             <dd>
               {info.spotsFilled}/{info.spotsAvailable} filled
-              {info.waitlistCount > 0 && ` (${info.waitlistCount} waitlist)`}
+              {(info.pendingCount > 0 || info.waitlistCount > 0) &&
+                ` (${[
+                  info.pendingCount > 0 && `${info.pendingCount} pending`,
+                  info.waitlistCount > 0 && `${info.waitlistCount} waitlist`,
+                ]
+                  .filter(Boolean)
+                  .join(', ')})`}
             </dd>
           </div>
         </dl>
@@ -241,15 +255,46 @@ export function OpenGymPage() {
               })()
             )}
 
-            {detail.waitlist.length > 0 && (
-              <>
-                <h2 className="open-gym-waitlist-heading">Waitlist</h2>
-                <ul className="open-gym-signups">
-                  {detail.waitlist.map((entry, i) => (
-                    <WaitlistRow key={i} entry={entry} />
-                  ))}
-                </ul>
-              </>
+            {full ? (
+              // Once full, unpaid signups can no longer claim a spot ahead of
+              // the waitlist, so they're folded into it (ordered by when
+              // each person actually joined, paid or not).
+              (() => {
+                const combinedWaitlist = [...detail.waitlist, ...detail.pendingSignups.map(signupAsWaitlistEntry)].sort(
+                  (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
+                )
+                return (
+                  combinedWaitlist.length > 0 && (
+                    <>
+                      <h2 className="open-gym-waitlist-heading">Waitlist</h2>
+                      <ul className="open-gym-signups">
+                        {combinedWaitlist.map((entry, i) => (
+                          <WaitlistRow key={i} entry={entry} />
+                        ))}
+                      </ul>
+                    </>
+                  )
+                )
+              })()
+            ) : (
+              detail.pendingSignups.length > 0 && (
+                <>
+                  <h2 className="open-gym-waitlist-heading">Pending</h2>
+                  <p className="signup-payment-notice">
+                    Your spot will not be confirmed until you make payment ({detail.price}).
+                    <div>Venmo:{' '}
+                      <a href="https://venmo.com/u/ducktatorsports" target="_blank" rel="noreferrer">
+                        @ducktatorsports
+                      </a></div>
+                    <div>Zelle: ducktatorsports</div>
+                  </p>
+                  <ul className="open-gym-signups">
+                    {detail.pendingSignups.map((signup, i) => (
+                      <SignupRow key={i} signup={signup} />
+                    ))}
+                  </ul>
+                </>
+              )
             )}
           </>
         )}

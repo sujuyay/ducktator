@@ -22,6 +22,7 @@ export interface OpenGymSummary {
   price: string
   spotsFilled: number
   spotsAvailable: number
+  pendingCount: number
   waitlistCount: number
 }
 
@@ -50,6 +51,7 @@ export interface OpenGymDetail extends OpenGymSummary {
   positions: PositionSlots[]
   groupNames: string[]
   signups: Signup[] // paid only, sorted most recent first
+  pendingSignups: Signup[] // unpaid, sorted most recent first
   waitlist: WaitlistEntry[] // sorted by join order, earliest first
 }
 

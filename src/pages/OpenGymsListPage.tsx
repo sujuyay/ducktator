@@ -33,7 +33,12 @@ function OpenGymsTable({ openGyms }: { openGyms: OpenGymSummary[] }) {
           </span>
           <span>{gym.location}</span>
           <span>{gym.price}</span>
-          <AvailabilityBar filled={gym.spotsFilled} available={gym.spotsAvailable} waitlistCount={gym.waitlistCount} />
+          <AvailabilityBar
+            filled={gym.spotsFilled}
+            available={gym.spotsAvailable}
+            pendingCount={gym.pendingCount}
+            waitlistCount={gym.waitlistCount}
+          />
         </Link>
       ))}
     </div>

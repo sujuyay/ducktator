@@ -121,7 +121,18 @@ function readWaitlist(spreadsheet) {
 function summarize(date, details, signups, waitlistCount) {
   const spotsAvailable = POSITIONS.reduce((sum, p) => sum + details.slots[p], 0)
   const spotsFilled = signups.filter((s) => s.paid).length
-  return { date, start: details.start, end: details.end, location: details.location, price: details.price, spotsFilled, spotsAvailable, waitlistCount }
+  const pendingCount = signups.filter((s) => !s.paid).length
+  return {
+    date,
+    start: details.start,
+    end: details.end,
+    location: details.location,
+    price: details.price,
+    spotsFilled,
+    spotsAvailable,
+    pendingCount,
+    waitlistCount,
+  }
 }
 
 function listOpenGyms() {
@@ -154,9 +165,17 @@ function getOpenGym(date) {
   }))
   const groupNames = [...new Set(signups.map((s) => s.groupName).filter(Boolean))].sort()
   const paidSignups = signups.filter((s) => s.paid).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+  const pendingSignups = signups.filter((s) => !s.paid).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
   const waitlist = readWaitlist(spreadsheet).sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
 
-  return { ...summarize(date, details, signups, waitlist.length), positions, groupNames, signups: paidSignups, waitlist }
+  return {
+    ...summarize(date, details, signups, waitlist.length),
+    positions,
+    groupNames,
+    signups: paidSignups,
+    pendingSignups,
+    waitlist,
+  }
 }
 
 function addSignup(date, input) {
