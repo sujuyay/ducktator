@@ -151,6 +151,9 @@ export function SignupModal({ groupNames, positions, price, waitlist = false, on
           {!waitlist && (
             <div className="signup-field">
               Position
+              <span className="signup-field-subtext">
+                Choose a specific position if possible. Only choose Flex if you cannot play the available positions.
+              </span>
               <div className="signup-position-buttons">
                 {positions.map((p) => {
                   const remaining = p.available - p.filled
