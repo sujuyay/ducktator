@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import type { Position, PositionSlots, SignupInput, WaitlistInput } from '../api/openGyms'
-import { POSITION_COLORS, withAlpha } from '../positionColors'
+import { getPositionColor, withAlpha } from '../positionColors'
 import './SignupModal.css'
 
 const NEW_GROUP = '__new__'
@@ -164,8 +164,11 @@ export function SignupModal({ groupNames, positions, price, waitlist = false, on
                       onClick={() => setPosition(p.position)}
                       style={
                         position === p.position
-                          ? { borderColor: POSITION_COLORS[p.position], background: POSITION_COLORS[p.position] }
-                          : { borderColor: POSITION_COLORS[p.position], background: withAlpha(POSITION_COLORS[p.position], '26') }
+                          ? { borderColor: getPositionColor(p.position), background: getPositionColor(p.position) }
+                          : {
+                              borderColor: getPositionColor(p.position),
+                              background: withAlpha(getPositionColor(p.position), '26'),
+                            }
                       }
                     >
                       {p.position}

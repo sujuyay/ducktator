@@ -8,7 +8,7 @@ function App() {
     <Routes>
       <Route path="/lineup" element={<LineupPage />} />
       <Route path="/open-gyms" element={<OpenGymsListPage />} />
-      <Route path="/open-gyms/:date" element={<OpenGymPage />} />
+      <Route path="/open-gyms/:id" element={<OpenGymPage />} />
       {/* Anything else (incl. /) redirects to the lineup page for now. */}
       <Route path="*" element={<Navigate to="/lineup" replace />} />
     </Routes>

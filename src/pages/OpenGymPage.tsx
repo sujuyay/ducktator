@@ -5,7 +5,7 @@ import { createSignup, getOpenGym, isOpenGymPast, joinWaitlist } from '../api/op
 import type { OpenGymDetail, OpenGymSummary, Signup, SignupInput, WaitlistEntry, WaitlistInput } from '../api/openGyms'
 import { SignupModal } from '../components/SignupModal'
 import { Spinner } from '../components/Spinner'
-import { POSITION_ABBREVIATIONS, POSITION_COLORS } from '../positionColors'
+import { getPositionAbbreviation, getPositionColor } from '../positionColors'
 import { formatDate } from './openGymFormat'
 import './OpenGymPage.css'
 
@@ -48,8 +48,8 @@ function SignupRow({ signup }: { signup: Signup }) {
         </span>
         {signup.groupName && <span className="open-gym-signup-group">{signup.groupName}</span>}
       </span>
-      <span className="open-gym-signup-position" style={{ background: POSITION_COLORS[signup.position] }}>
-        {POSITION_ABBREVIATIONS[signup.position]}
+      <span className="open-gym-signup-position" style={{ background: getPositionColor(signup.position) }}>
+        {getPositionAbbreviation(signup.position)}
       </span>
     </li>
   )
@@ -77,7 +77,7 @@ function WaitlistRow({ entry }: { entry: WaitlistEntry }) {
 }
 
 export function OpenGymPage() {
-  const { date } = useParams<{ date: string }>()
+  const { id } = useParams<{ id: string }>()
   const location = useLocation()
   // Passed by OpenGymsListPage's Link so the header info (date, time,
   // location, price, spots) can render immediately, before the full detail
@@ -91,11 +91,11 @@ export function OpenGymPage() {
   const [toastMessage, setToastMessage] = useState<string | null>(null)
 
   const refresh = useCallback(() => {
-    if (!date) return
-    getOpenGym(date)
+    if (!id) return
+    getOpenGym(id)
       .then((gym) => setDetail(gym ?? undefined))
       .catch((err: unknown) => setLoadError(err instanceof Error ? err.message : 'Failed to load open gym.'))
-  }, [date])
+  }, [id])
 
   useEffect(() => {
     refresh()
@@ -147,15 +147,15 @@ export function OpenGymPage() {
     )
   }
 
-  const past = isOpenGymPast(info.date, info.end)
+  const past = isOpenGymPast(info.endTime)
   const full = detail ? detail.positions.every((p) => p.filled >= p.available) : false
 
   const handleSubmit = async (input: SignupInput | WaitlistInput) => {
     if (modalMode === 'waitlist') {
-      await joinWaitlist(info.date, input as WaitlistInput)
+      await joinWaitlist(info.id, input as WaitlistInput)
       setToastMessage('Joined waitlist!')
     } else {
-      await createSignup(info.date, input as SignupInput)
+      await createSignup(info.id, input as SignupInput)
       setToastMessage('Submitted! Make payment to confirm your spot.')
     }
     setShowModal(false)

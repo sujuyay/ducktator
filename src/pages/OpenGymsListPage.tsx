@@ -21,9 +21,9 @@ function OpenGymsTable({ openGyms }: { openGyms: OpenGymSummary[] }) {
 
       {openGyms.map((gym) => (
         <Link
-          key={gym.date}
+          key={gym.id}
           className="open-gyms-row open-gym-card"
-          to={`/open-gyms/${gym.date}`}
+          to={`/open-gyms/${gym.id}`}
           state={{ summary: gym }}
           role="row"
         >

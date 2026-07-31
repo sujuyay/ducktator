@@ -1,12 +1,11 @@
-// Data-access layer for open gyms, backed by the Google Apps Script Web App
-// defined in scripts/apps-script.gs. That script reads/writes a Google Drive
-// folder of Sheets (one sheet per open gym, named after its date, with
-// "Details", "Signups", and "Waitlist" tabs) and is deployed separately from
-// this site - see scripts/apps-script.gs's header comment for deploy steps.
+// Data-access layer for open gyms, backed by Supabase (see the `open_gyms`,
+// `position_slots`, `signups`, and `waitlist` tables). Positions are plain
+// text rows in `position_slots` rather than a fixed enum, so adding a new
+// position (e.g. "Libero") is just inserting rows - no schema change needed.
 
-export type Position = 'Setter' | 'Middle' | 'Outside' | 'Opposite' | 'Flex'
+import { supabase } from './supabaseClient'
 
-export const POSITIONS: Position[] = ['Setter', 'Middle', 'Outside', 'Opposite', 'Flex']
+export type Position = string
 
 export interface PositionSlots {
   position: Position
@@ -15,9 +14,11 @@ export interface PositionSlots {
 }
 
 export interface OpenGymSummary {
-  date: string // sheet title, e.g. "2026-08-15"
-  start: string
-  end: string
+  id: string
+  date: string // "YYYY-MM-DD"
+  start: string // e.g. "6:00 PM", for display
+  end: string // e.g. "8:00 PM", for display
+  endTime: string // ISO instant - used to tell whether the gym is over
   location: string
   price: string
   spotsFilled: number
@@ -72,89 +73,109 @@ export interface WaitlistInput {
   waiverCompleted: boolean
 }
 
-const APPS_SCRIPT_URL = import.meta.env.VITE_APPS_SCRIPT_URL
-
-function requireUrl(): string {
-  if (!APPS_SCRIPT_URL) {
-    throw new Error(
-      'VITE_APPS_SCRIPT_URL is not set. Deploy scripts/apps-script.gs as a Web App and set the URL in .env.local.',
-    )
-  }
-  return APPS_SCRIPT_URL
-}
-
-interface ErrorResponse {
-  error: string
-}
-
-const isErrorResponse = (data: unknown): data is ErrorResponse =>
-  typeof data === 'object' && data !== null && typeof (data as ErrorResponse).error === 'string'
-
-async function get<T>(params: Record<string, string>): Promise<T> {
-  const url = new URL(requireUrl())
-  for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value)
-
-  const response = await fetch(url.toString())
-  const data = await response.json()
-  if (isErrorResponse(data)) throw new Error(data.error)
-  return data as T
-}
-
-// Sent as text/plain (not application/json) so the browser doesn't preflight
-// the request with an OPTIONS call - Apps Script Web Apps don't implement
-// doOptions, so a preflighted request would fail outright. doPost still
-// parses the body as JSON regardless of the declared content type.
-async function post<T>(body: unknown): Promise<T> {
-  const response = await fetch(requireUrl(), {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify(body),
-  })
-  const data = await response.json()
-  if (isErrorResponse(data)) throw new Error(data.error)
-  return data as T
-}
-
 // Open gym dates/times are always in US Eastern time (observing DST, i.e.
 // EST/EDT as a wall clock in America/New_York would show).
 const EASTERN_TZ = 'America/New_York'
 
-function tzOffsetMs(date: Date, timeZone: string): number {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone,
-    hourCycle: 'h23',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
+function formatTime(iso: string): string {
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: EASTERN_TZ,
+    hour: 'numeric',
     minute: '2-digit',
-    second: '2-digit',
-  }).formatToParts(date)
-
-  const get = (type: string) => Number(parts.find((p) => p.type === type)?.value)
-  const asUTC = Date.UTC(get('year'), get('month') - 1, get('day'), get('hour'), get('minute'), get('second'))
-  return asUTC - date.getTime()
-}
-
-function parseEasternDateTime(date: string, time: string): Date {
-  const match = /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i.exec(time.trim())
-  let hh = '00'
-  let minutes = '00'
-  if (match) {
-    let hours = Number(match[1]) % 12
-    if (match[3].toUpperCase() === 'PM') hours += 12
-    hh = String(hours).padStart(2, '0')
-    minutes = match[2]
-  }
-
-  // Interpret the wall-clock date/time as if it were UTC, then shift by
-  // America/New_York's actual offset (EST or EDT) at that moment.
-  const naiveUtc = new Date(`${date}T${hh}:${minutes}:00Z`)
-  return new Date(naiveUtc.getTime() - tzOffsetMs(naiveUtc, EASTERN_TZ))
+    hour12: true,
+  }).format(new Date(iso))
 }
 
 // An open gym is "in the future" (and available to sign up for) until it ends.
-export const isOpenGymPast = (date: string, end: string) => parseEasternDateTime(date, end).getTime() <= Date.now()
+export const isOpenGymPast = (endTime: string) => new Date(endTime).getTime() <= Date.now()
+
+interface SummaryRow {
+  id: string
+  date: string
+  start_time: string
+  end_time: string
+  location: string
+  price: string
+  position_slots: { available: number }[]
+  signups: { paid: boolean }[]
+  waitlist: { id: string }[]
+}
+
+const SUMMARY_SELECT =
+  'id, date, start_time, end_time, location, price, position_slots(available), signups(paid), waitlist(id)'
+
+function rowToSummary(row: SummaryRow): OpenGymSummary {
+  return {
+    id: row.id,
+    date: row.date,
+    start: formatTime(row.start_time),
+    end: formatTime(row.end_time),
+    endTime: row.end_time,
+    location: row.location,
+    price: row.price,
+    spotsAvailable: row.position_slots.reduce((sum, p) => sum + p.available, 0),
+    spotsFilled: row.signups.filter((s) => s.paid).length,
+    pendingCount: row.signups.filter((s) => !s.paid).length,
+    waitlistCount: row.waitlist.length,
+  }
+}
+
+interface SignupRow {
+  id: string
+  created_at: string
+  first_name: string
+  last_name: string
+  phone_number: string
+  group_name: string
+  position: string
+  waiver_completed: boolean
+  paid: boolean
+  team: string
+}
+
+interface WaitlistRow {
+  id: string
+  created_at: string
+  first_name: string
+  last_name: string
+  phone_number: string
+  group_name: string
+  waiver_completed: boolean
+}
+
+interface DetailRow extends SummaryRow {
+  position_slots: { position: string; available: number }[]
+  signups: SignupRow[]
+  waitlist: WaitlistRow[]
+}
+
+const DETAIL_SELECT =
+  'id, date, start_time, end_time, location, price, position_slots(position, available), signups(*), waitlist(*)'
+
+function rowToSignup(row: SignupRow): Signup {
+  return {
+    timestamp: row.created_at,
+    firstName: row.first_name,
+    lastName: row.last_name,
+    phoneNumber: row.phone_number,
+    groupName: row.group_name,
+    team: row.team,
+    position: row.position,
+    waiverCompleted: row.waiver_completed,
+    paid: row.paid,
+  }
+}
+
+function rowToWaitlistEntry(row: WaitlistRow): WaitlistEntry {
+  return {
+    timestamp: row.created_at,
+    firstName: row.first_name,
+    lastName: row.last_name,
+    phoneNumber: row.phone_number,
+    groupName: row.group_name,
+    waiverCompleted: row.waiver_completed,
+  }
+}
 
 // Module-level cache, shared by every page for the lifetime of the SPA (this
 // module is only ever loaded once, so navigating between routes doesn't
@@ -165,42 +186,124 @@ let openGymsCache: Promise<OpenGymSummary[]> | null = null
 let pastOpenGymsCache: Promise<OpenGymSummary[]> | null = null
 const openGymDetailCache = new Map<string, Promise<OpenGymDetail | undefined>>()
 
-function invalidateCaches(date: string) {
+function invalidateCaches(id: string) {
   openGymsCache = null
   pastOpenGymsCache = null
-  openGymDetailCache.delete(date)
+  openGymDetailCache.delete(id)
 }
 
 export async function listOpenGyms(): Promise<OpenGymSummary[]> {
-  openGymsCache ??= get<OpenGymSummary[]>({ action: 'list' })
+  openGymsCache ??= (async () => {
+    const { data, error } = await supabase
+      .from('open_gyms')
+      .select(SUMMARY_SELECT)
+      .gt('end_time', new Date().toISOString())
+      .order('date', { ascending: true })
+    if (error) throw new Error(error.message)
+    return (data as SummaryRow[]).map(rowToSummary)
+  })()
   return openGymsCache
 }
 
 export async function listPastOpenGyms(): Promise<OpenGymSummary[]> {
-  pastOpenGymsCache ??= get<OpenGymSummary[]>({ action: 'list-past' })
+  pastOpenGymsCache ??= (async () => {
+    const cutoff = new Date()
+    cutoff.setMonth(cutoff.getMonth() - 1)
+    const { data, error } = await supabase
+      .from('open_gyms')
+      .select(SUMMARY_SELECT)
+      .lte('end_time', new Date().toISOString())
+      .gte('date', cutoff.toISOString().slice(0, 10))
+      .order('date', { ascending: false })
+    if (error) throw new Error(error.message)
+    return (data as SummaryRow[]).map(rowToSummary)
+  })()
   return pastOpenGymsCache
 }
 
-export async function getOpenGym(date: string): Promise<OpenGymDetail | undefined> {
-  let cached = openGymDetailCache.get(date)
+export async function getOpenGym(id: string): Promise<OpenGymDetail | undefined> {
+  let cached = openGymDetailCache.get(id)
   if (!cached) {
-    cached = get<OpenGymDetail>({ action: 'get', date }).catch((err: unknown) => {
-      if (err instanceof Error && err.message === 'Not found') return undefined
-      throw err
-    })
-    openGymDetailCache.set(date, cached)
+    cached = (async () => {
+      const { data, error } = await supabase.from('open_gyms').select(DETAIL_SELECT).eq('id', id).maybeSingle()
+      if (error) throw new Error(error.message)
+      if (!data) return undefined
+
+      const row = data as DetailRow
+      const signups = row.signups.map(rowToSignup)
+      const paidSignups = signups
+        .filter((s) => s.paid)
+        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      const pendingSignups = signups
+        .filter((s) => !s.paid)
+        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      const waitlist = row.waitlist
+        .map(rowToWaitlistEntry)
+        .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+      const groupNames = [...new Set(signups.map((s) => s.groupName).filter(Boolean))].sort()
+      const positions: PositionSlots[] = row.position_slots.map((p) => ({
+        position: p.position,
+        available: p.available,
+        filled: signups.filter((s) => s.paid && s.position === p.position).length,
+      }))
+
+      return {
+        id: row.id,
+        date: row.date,
+        start: formatTime(row.start_time),
+        end: formatTime(row.end_time),
+        endTime: row.end_time,
+        location: row.location,
+        price: row.price,
+        spotsAvailable: positions.reduce((sum, p) => sum + p.available, 0),
+        spotsFilled: paidSignups.length,
+        pendingCount: pendingSignups.length,
+        waitlistCount: waitlist.length,
+        positions,
+        groupNames,
+        signups: paidSignups,
+        pendingSignups,
+        waitlist,
+      }
+    })()
+    openGymDetailCache.set(id, cached)
   }
   return cached
 }
 
-export async function createSignup(date: string, input: SignupInput): Promise<Signup> {
-  const signup = await post<Signup>({ date, ...input })
-  invalidateCaches(date)
-  return signup
+export async function createSignup(openGymId: string, input: SignupInput): Promise<Signup> {
+  const { data, error } = await supabase
+    .from('signups')
+    .insert({
+      open_gym_id: openGymId,
+      first_name: input.firstName,
+      last_name: input.lastName,
+      phone_number: input.phoneNumber || '',
+      group_name: input.groupName || '',
+      position: input.position,
+      waiver_completed: input.waiverCompleted,
+    })
+    .select()
+    .single()
+  if (error) throw new Error(error.message)
+  invalidateCaches(openGymId)
+  return rowToSignup(data)
 }
 
-export async function joinWaitlist(date: string, input: WaitlistInput): Promise<WaitlistEntry> {
-  const entry = await post<WaitlistEntry>({ date, type: 'waitlist', ...input })
-  invalidateCaches(date)
-  return entry
+export async function joinWaitlist(openGymId: string, input: WaitlistInput): Promise<WaitlistEntry> {
+  const { data, error } = await supabase
+    .from('waitlist')
+    .insert({
+      open_gym_id: openGymId,
+      first_name: input.firstName,
+      last_name: input.lastName,
+      phone_number: input.phoneNumber || '',
+      group_name: input.groupName || '',
+      waiver_completed: input.waiverCompleted,
+    })
+    .select()
+    .single()
+  if (error) throw new Error(error.message)
+  invalidateCaches(openGymId)
+  return rowToWaitlistEntry(data)
 }
