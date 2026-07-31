@@ -1,0 +1,6 @@
+/* The login form reuses the admin page's field/button styles (AdminPage.css,
+   imported by both admin pages that wrap this gate). */
+.admin-login h1 {
+  margin: 0 0 1.5rem;
+  font-size: 1.5rem;
+}

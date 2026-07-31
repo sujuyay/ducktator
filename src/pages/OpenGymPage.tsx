@@ -59,8 +59,8 @@ function SignupRow({ signup }: { signup: Signup }) {
 // for a spot just like a waitlist entry - render it the same way, dropping
 // the position it originally requested.
 function signupAsWaitlistEntry(signup: Signup): WaitlistEntry {
-  const { timestamp, firstName, lastName, phoneNumber, groupName, waiverCompleted } = signup
-  return { timestamp, firstName, lastName, phoneNumber, groupName, waiverCompleted }
+  const { id, timestamp, firstName, lastName, phoneNumber, groupName, waiverCompleted } = signup
+  return { id, timestamp, firstName, lastName, phoneNumber, groupName, waiverCompleted }
 }
 
 function WaitlistRow({ entry }: { entry: WaitlistEntry }) {
@@ -236,8 +236,8 @@ export function OpenGymPage() {
                       <div key={group.team} className="open-gym-team-group">
                         <h3>{group.team}</h3>
                         <ul className="open-gym-signups">
-                          {group.signups.map((signup, i) => (
-                            <SignupRow key={i} signup={signup} />
+                          {group.signups.map((signup) => (
+                            <SignupRow key={signup.id} signup={signup} />
                           ))}
                         </ul>
                       </div>
@@ -245,8 +245,8 @@ export function OpenGymPage() {
 
                     {ungrouped.length > 0 && (
                       <ul className="open-gym-signups">
-                        {ungrouped.map((signup, i) => (
-                          <SignupRow key={i} signup={signup} />
+                        {ungrouped.map((signup) => (
+                          <SignupRow key={signup.id} signup={signup} />
                         ))}
                       </ul>
                     )}
@@ -268,8 +268,8 @@ export function OpenGymPage() {
                     <>
                       <h2 className="open-gym-waitlist-heading">Waitlist</h2>
                       <ul className="open-gym-signups">
-                        {combinedWaitlist.map((entry, i) => (
-                          <WaitlistRow key={i} entry={entry} />
+                        {combinedWaitlist.map((entry) => (
+                          <WaitlistRow key={entry.id} entry={entry} />
                         ))}
                       </ul>
                     </>
@@ -289,8 +289,8 @@ export function OpenGymPage() {
                     <div>Zelle: ducktatorsports</div>
                   </p>
                   <ul className="open-gym-signups">
-                    {detail.pendingSignups.map((signup, i) => (
-                      <SignupRow key={i} signup={signup} />
+                    {detail.pendingSignups.map((signup) => (
+                      <SignupRow key={signup.id} signup={signup} />
                     ))}
                   </ul>
                 </>

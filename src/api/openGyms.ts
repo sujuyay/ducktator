@@ -18,7 +18,8 @@ export interface OpenGymSummary {
   date: string // "YYYY-MM-DD"
   start: string // e.g. "6:00 PM", for display
   end: string // e.g. "8:00 PM", for display
-  endTime: string // ISO instant - used to tell whether the gym is over
+  startTime: string // ISO instant - the underlying value, for editing
+  endTime: string // ISO instant - also used to tell whether the gym is over
   location: string
   price: string
   spotsFilled: number
@@ -28,6 +29,7 @@ export interface OpenGymSummary {
 }
 
 export interface Signup {
+  id: string
   timestamp: string // ISO 8601
   firstName: string
   lastName: string
@@ -40,6 +42,7 @@ export interface Signup {
 }
 
 export interface WaitlistEntry {
+  id: string
   timestamp: string // ISO 8601
   firstName: string
   lastName: string
@@ -86,6 +89,62 @@ function formatTime(iso: string): string {
   }).format(new Date(iso))
 }
 
+function easternParts(date: Date): Record<string, string> {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: EASTERN_TZ,
+    hourCycle: 'h23',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  }).formatToParts(date)
+  return Object.fromEntries(parts.map((p) => [p.type, p.value]))
+}
+
+// How far Eastern's wall clock sits from UTC at a given instant, in ms
+// (negative, since America/New_York is behind UTC): -4h under EDT, -5h under EST.
+function easternOffsetMs(date: Date): number {
+  const p = easternParts(date)
+  const asUTC = Date.UTC(
+    Number(p.year),
+    Number(p.month) - 1,
+    Number(p.day),
+    Number(p.hour),
+    Number(p.minute),
+    Number(p.second),
+  )
+  return asUTC - date.getTime()
+}
+
+// Eastern wall clock "YYYY-MM-DDTHH:MM" (what an <input type="datetime-local">
+// produces) -> the matching UTC instant, so the admin enters plain Eastern
+// times year-round without thinking about DST or their device's timezone.
+//
+// Solves `instant + offset(instant) = wall` by fixed-point iteration. The
+// first pass samples the offset at the wall time read as UTC, which can land
+// on the wrong side of a DST transition (e.g. 3 AM on the spring-forward day
+// samples the previous evening, still EST, and lands an hour late). The second
+// pass re-samples at that much closer instant, which settles it.
+export function easternWallTimeToISO(wall: string): string {
+  const withSeconds = wall.length === 16 ? `${wall}:00` : wall
+  const wallAsUtc = new Date(`${withSeconds}Z`).getTime()
+  const firstPass = wallAsUtc - easternOffsetMs(new Date(wallAsUtc))
+  return new Date(wallAsUtc - easternOffsetMs(new Date(firstPass))).toISOString()
+}
+
+// Inverse of easternWallTimeToISO, for populating a datetime-local input.
+export function isoToEasternWallTime(iso: string): string {
+  const p = easternParts(new Date(iso))
+  return `${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}`
+}
+
+// The Eastern calendar date an instant falls on, for the `date` column.
+export function easternDate(iso: string): string {
+  return isoToEasternWallTime(iso).slice(0, 10)
+}
+
 // An open gym is "in the future" (and available to sign up for) until it ends.
 export const isOpenGymPast = (endTime: string) => new Date(endTime).getTime() <= Date.now()
 
@@ -110,6 +169,7 @@ function rowToSummary(row: SummaryRow): OpenGymSummary {
     date: row.date,
     start: formatTime(row.start_time),
     end: formatTime(row.end_time),
+    startTime: row.start_time,
     endTime: row.end_time,
     location: row.location,
     price: row.price,
@@ -154,6 +214,7 @@ const DETAIL_SELECT =
 
 function rowToSignup(row: SignupRow): Signup {
   return {
+    id: row.id,
     timestamp: row.created_at,
     firstName: row.first_name,
     lastName: row.last_name,
@@ -168,6 +229,7 @@ function rowToSignup(row: SignupRow): Signup {
 
 function rowToWaitlistEntry(row: WaitlistRow): WaitlistEntry {
   return {
+    id: row.id,
     timestamp: row.created_at,
     firstName: row.first_name,
     lastName: row.last_name,
@@ -186,10 +248,13 @@ let openGymsCache: Promise<OpenGymSummary[]> | null = null
 let pastOpenGymsCache: Promise<OpenGymSummary[]> | null = null
 const openGymDetailCache = new Map<string, Promise<OpenGymDetail | undefined>>()
 
-function invalidateCaches(id: string) {
+// Exported so admin mutations (see admin.ts) can drop stale reads after
+// changing data - the public pages share this same cache.
+export function invalidateCaches(id?: string) {
   openGymsCache = null
   pastOpenGymsCache = null
-  openGymDetailCache.delete(id)
+  if (id === undefined) openGymDetailCache.clear()
+  else openGymDetailCache.delete(id)
 }
 
 export async function listOpenGyms(): Promise<OpenGymSummary[]> {
@@ -219,6 +284,14 @@ export async function listPastOpenGyms(): Promise<OpenGymSummary[]> {
     return (data as SummaryRow[]).map(rowToSummary)
   })()
   return pastOpenGymsCache
+}
+
+// Every open gym regardless of date, newest first. Uncached - the admin page
+// needs to see its own writes immediately.
+export async function listAllOpenGyms(): Promise<OpenGymSummary[]> {
+  const { data, error } = await supabase.from('open_gyms').select(SUMMARY_SELECT).order('date', { ascending: false })
+  if (error) throw new Error(error.message)
+  return (data as SummaryRow[]).map(rowToSummary)
 }
 
 export async function getOpenGym(id: string): Promise<OpenGymDetail | undefined> {
@@ -252,6 +325,7 @@ export async function getOpenGym(id: string): Promise<OpenGymDetail | undefined>
         date: row.date,
         start: formatTime(row.start_time),
         end: formatTime(row.end_time),
+        startTime: row.start_time,
         endTime: row.end_time,
         location: row.location,
         price: row.price,

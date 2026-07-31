@@ -1,0 +1,401 @@
+/* Matches the open gym pages: the lineup library paints `body` from its own
+   dark theme globally, so scope a light background back on while an admin
+   page is mounted. */
+body:has(.admin-shell) {
+  background: #f4f6f8;
+  color: #1a1f2e;
+}
+
+.admin-shell {
+  min-height: calc(100vh - 160px);
+  min-height: calc(100dvh - 160px);
+  background: #f4f6f8;
+  color: #1a1f2e;
+  font-family: Nunito, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, system-ui, sans-serif;
+  /* Native form controls would otherwise inherit the site's dark color-scheme. */
+  color-scheme: light;
+}
+
+.admin-page,
+.admin-login {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem 4rem;
+}
+
+.admin-page h1,
+.admin-page h2,
+.admin-login h1 {
+  color: #1a1f2e;
+}
+
+.admin-page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.admin-page-header h1 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.admin-back {
+  display: inline-block;
+  margin-bottom: 1rem;
+  color: #06a4b4;
+  text-decoration: none;
+}
+
+.admin-back:hover {
+  text-decoration: underline;
+}
+
+.admin-error {
+  padding: 0.6rem 0.8rem;
+  border-radius: 6px;
+  background: #fdecea;
+  border: 1px solid #f3b7b0;
+  color: #c0392b;
+  font-size: 0.85rem;
+}
+
+.admin-empty {
+  color: #5b6b73;
+  font-size: 0.9rem;
+}
+
+/* --- Login --- */
+
+.admin-login {
+  display: flex;
+  flex-direction: column;
+  max-width: 360px;
+}
+
+/* --- Buttons --- */
+
+.admin-button {
+  padding: 0.6rem 1.1rem;
+  border: none;
+  border-radius: 8px;
+  background: #06a4b4;
+  color: #fff;
+  font: inherit;
+  font-weight: 700;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.admin-button:disabled {
+  background: #d3d9db;
+  color: #8a9499;
+  cursor: not-allowed;
+}
+
+.admin-button-secondary {
+  background: transparent;
+  color: #1a1f2e;
+  border: 1px solid #cfd6d9;
+}
+
+.admin-danger-button {
+  padding: 0.45rem 0.8rem;
+  border-radius: 6px;
+  border: 1px solid #f3b7b0;
+  background: #fff;
+  color: #c0392b;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.admin-new-gym {
+  display: block;
+  width: 100%;
+  margin: 1.5rem 0;
+}
+
+/* --- Fields --- */
+
+.admin-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 1rem;
+  font-size: 0.85rem;
+  color: #4a5a63;
+}
+
+.admin-field input,
+.admin-field select {
+  padding: 0.55rem 0.6rem;
+  border-radius: 6px;
+  border: 1px solid #cfd6d9;
+  background: #f4f6f8;
+  color: #1a1f2e;
+  font: inherit;
+}
+
+.admin-field input:focus,
+.admin-field select:focus {
+  outline: none;
+  border-color: #06a4b4;
+}
+
+.admin-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+/* --- Cards --- */
+
+.admin-card {
+  margin: 1.5rem 0;
+  padding: 1.25rem;
+  border-radius: 10px;
+  border: 1px solid #dfe4e7;
+  background: #fff;
+}
+
+.admin-card h2 {
+  margin: 0 0 1rem;
+  font-size: 1.1rem;
+}
+
+.admin-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.admin-card-header h2 {
+  margin: 0;
+}
+
+.admin-detail-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 1rem;
+  margin: 0 0 1rem;
+}
+
+.admin-detail-list dt {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #5b6b73;
+}
+
+.admin-detail-list dd {
+  margin: 0.2rem 0 0;
+  font-weight: 700;
+}
+
+.admin-slot-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0;
+}
+
+.admin-slot-summary li {
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  background: #f4f6f8;
+  border: 1px solid #dfe4e7;
+  font-size: 0.75rem;
+  color: #4a5a63;
+}
+
+.admin-delete-gym {
+  margin-top: 0.25rem;
+}
+
+/* --- Gym list --- */
+
+.admin-gym-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.admin-gym-list a {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.85rem 1rem;
+  border-radius: 8px;
+  border: 1px solid #dfe4e7;
+  background: #fff;
+  color: #1a1f2e;
+  text-decoration: none;
+}
+
+.admin-gym-list a:hover {
+  border-color: #06a4b4;
+}
+
+.admin-gym-date {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 700;
+}
+
+.admin-gym-past {
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: #eceff1;
+  color: #5b6b73;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.admin-gym-meta {
+  font-size: 0.8rem;
+  color: #5b6b73;
+}
+
+/* --- Position slot editor --- */
+
+.admin-slots {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.admin-slot-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.admin-slot-position {
+  flex: 1;
+  min-width: 0;
+}
+
+.admin-slot-count {
+  width: 5.5rem;
+  flex-shrink: 0;
+}
+
+.admin-slot-remove {
+  flex-shrink: 0;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 6px;
+  border: 1px solid #cfd6d9;
+  background: #fff;
+  color: #c0392b;
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.admin-add-slot {
+  align-self: flex-start;
+  margin-top: 0.5rem;
+  font-size: 0.8rem;
+}
+
+/* --- Signup / waitlist rows --- */
+
+.admin-entries {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.admin-entry {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: 8px;
+  border: 1px solid #dfe4e7;
+  background: #fbfcfc;
+}
+
+.admin-entry-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 8rem;
+}
+
+.admin-entry-name {
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.admin-entry-meta {
+  font-size: 0.75rem;
+  color: #5b6b73;
+}
+
+.admin-entry-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.6rem;
+}
+
+.admin-inline-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #5b6b73;
+}
+
+.admin-inline-field input[type='checkbox'] {
+  width: 1.15rem;
+  height: 1.15rem;
+  accent-color: #06a4b4;
+}
+
+.admin-inline-field select,
+.admin-inline-field input:not([type='checkbox']) {
+  padding: 0.35rem 0.4rem;
+  border-radius: 6px;
+  border: 1px solid #cfd6d9;
+  background: #fff;
+  color: #1a1f2e;
+  font: inherit;
+  font-size: 0.8rem;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.admin-team-input {
+  width: 6.5rem;
+}
+
+.admin-promote-button {
+  padding: 0.4rem 0.8rem;
+  font-size: 0.8rem;
+}
