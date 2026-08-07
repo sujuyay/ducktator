@@ -6,6 +6,11 @@ import './SignupModal.css'
 
 const NEW_GROUP = '__new__'
 
+// Mirrors the length limits enforced by check constraints on the signups and
+// waitlist tables, so overlong input is stopped here rather than surfacing as
+// a database error after submitting.
+const MAX_TEXT_LENGTH = 60
+
 // Capitalizes the first letter after the start of the string or a space/
 // hyphen/apostrophe, without touching the rest (so "McDonald" typed as-is
 // stays intact rather than getting force-lowercased).
@@ -101,6 +106,7 @@ export function SignupModal({ groupNames, positions, price, waitlist = false, on
             <input
               value={firstName}
               onChange={(e) => setFirstName(capitalizeName(e.target.value))}
+              maxLength={MAX_TEXT_LENGTH}
               required
             />
           </label>
@@ -110,6 +116,7 @@ export function SignupModal({ groupNames, positions, price, waitlist = false, on
             <input
               value={lastName}
               onChange={(e) => setLastName(capitalizeName(e.target.value))}
+              maxLength={MAX_TEXT_LENGTH}
               required
             />
           </label>
@@ -144,7 +151,12 @@ export function SignupModal({ groupNames, positions, price, waitlist = false, on
           {groupChoice === NEW_GROUP && (
             <label className="signup-field">
               New Group Name
-              <input value={newGroupName} onChange={(e) => setNewGroupName(e.target.value)} required />
+              <input
+                value={newGroupName}
+                onChange={(e) => setNewGroupName(e.target.value)}
+                maxLength={MAX_TEXT_LENGTH}
+                required
+              />
             </label>
           )}
 

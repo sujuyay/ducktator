@@ -59,8 +59,8 @@ function SignupRow({ signup }: { signup: Signup }) {
 // for a spot just like a waitlist entry - render it the same way, dropping
 // the position it originally requested.
 function signupAsWaitlistEntry(signup: Signup): WaitlistEntry {
-  const { id, timestamp, firstName, lastName, phoneNumber, groupName, waiverCompleted } = signup
-  return { id, timestamp, firstName, lastName, phoneNumber, groupName, waiverCompleted }
+  const { id, timestamp, firstName, lastName, groupName, waiverCompleted } = signup
+  return { id, timestamp, firstName, lastName, groupName, waiverCompleted }
 }
 
 function WaitlistRow({ entry }: { entry: WaitlistEntry }) {

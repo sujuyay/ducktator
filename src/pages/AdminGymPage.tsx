@@ -10,8 +10,8 @@ import {
   updateSignup,
 } from '../api/admin'
 import type { OpenGymInput } from '../api/admin'
-import { getOpenGym } from '../api/openGyms'
-import type { OpenGymDetail, Position, Signup, WaitlistEntry } from '../api/openGyms'
+import { getOpenGymForAdmin } from '../api/openGyms'
+import type { AdminOpenGymDetail, AdminSignup, AdminWaitlistEntry, Position } from '../api/openGyms'
 import { AdminGate } from '../components/AdminGate'
 import { OpenGymForm } from '../components/OpenGymForm'
 import { Spinner } from '../components/Spinner'
@@ -21,25 +21,32 @@ import './AdminPage.css'
 function SignupAdminRow({
   signup,
   positions,
+  teams,
   onChange,
   onDelete,
 }: {
-  signup: Signup
+  signup: AdminSignup
   positions: Position[]
-  onChange: (changes: Partial<Pick<Signup, 'paid' | 'team' | 'position'>>) => Promise<void>
+  teams: string[]
+  onChange: (changes: Partial<Pick<AdminSignup, 'paid' | 'team' | 'position'>>) => Promise<void>
   onDelete: () => Promise<void>
 }) {
   return (
     <li className="admin-entry">
       <div className="admin-entry-main">
-        <span className="admin-entry-name">
-          {signup.firstName} {signup.lastName}
-        </span>
-        <span className="admin-entry-meta">
-          {signup.phoneNumber}
-          {signup.groupName && ` · ${signup.groupName}`}
-          {!signup.waiverCompleted && ' · no waiver'}
-        </span>
+        <button type="button" className="admin-danger-button" onClick={() => void onDelete()}>
+          X
+        </button>
+        <div>
+          <div className="admin-entry-name">
+            {signup.firstName} {signup.lastName}
+          </div>
+          <span className="admin-entry-meta">
+            {signup.phoneNumber}
+            {signup.groupName && ` · ${signup.groupName}`}
+            {!signup.waiverCompleted && ' · no waiver'}
+          </span>
+        </div>
       </div>
 
       <div className="admin-entry-controls">
@@ -64,23 +71,23 @@ function SignupAdminRow({
 
         <label className="admin-inline-field">
           Team
-          <input
+          <select
             className="admin-team-input"
-            defaultValue={signup.team}
-            placeholder="none"
-            onBlur={(e) => {
-              const next = e.target.value.trim()
-              if (next !== signup.team) void onChange({ team: next })
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') e.currentTarget.blur()
-            }}
-          />
+            value={signup.team}
+            onChange={(e) => void onChange({ team: e.target.value })}
+          >
+            <option value="">None</option>
+            {/* A team assigned before the slot count shrank (or named by hand)
+                still needs to render as the current value rather than silently
+                resetting to None. */}
+            {signup.team && !teams.includes(signup.team) && <option value={signup.team}>{signup.team}</option>}
+            {teams.map((team) => (
+              <option key={team} value={team}>
+                {team}
+              </option>
+            ))}
+          </select>
         </label>
-
-        <button type="button" className="admin-danger-button" onClick={() => void onDelete()}>
-          Delete
-        </button>
       </div>
     </li>
   )
@@ -92,7 +99,7 @@ function WaitlistAdminRow({
   onPromote,
   onDelete,
 }: {
-  entry: WaitlistEntry
+  entry: AdminWaitlistEntry
   positions: Position[]
   onPromote: (position: Position) => Promise<void>
   onDelete: () => Promise<void>
@@ -143,12 +150,12 @@ function WaitlistAdminRow({
 
 function AdminGymPageContent({ id }: { id: string }) {
   const navigate = useNavigate()
-  const [detail, setDetail] = useState<OpenGymDetail | null | undefined>(null)
+  const [detail, setDetail] = useState<AdminOpenGymDetail | null | undefined>(null)
   const [error, setError] = useState<string | null>(null)
   const [editing, setEditing] = useState(false)
 
   const refresh = useCallback(() => {
-    getOpenGym(id)
+    getOpenGymForAdmin(id)
       .then((gym) => setDetail(gym ?? undefined))
       .catch((err: unknown) => setError(err instanceof Error ? err.message : 'Failed to load open gym.'))
   }, [id])
@@ -186,6 +193,8 @@ function AdminGymPageContent({ id }: { id: string }) {
   }
 
   const positions = detail.positions.map((p) => p.position)
+  // One team per 7 spots, so a 28 spot gym offers Team 1 through Team 4.
+  const teams = Array.from({ length: Math.floor(detail.spotsAvailable / 7) }, (_, i) => `Team ${i + 1}`)
   // Paid and pending together, newest first - the admin manages one list and
   // the paid checkbox is what splits them on the public page.
   const allSignups = [...detail.signups, ...detail.pendingSignups].sort(
@@ -288,6 +297,7 @@ function AdminGymPageContent({ id }: { id: string }) {
                 key={signup.id}
                 signup={signup}
                 positions={positions}
+                teams={teams}
                 onChange={(changes) => run(() => updateSignup(id, signup.id, changes))}
                 onDelete={() =>
                   run(async () => {

@@ -7,7 +7,7 @@
 
 import type { Session } from '@supabase/supabase-js'
 import { easternDate, invalidateCaches } from './openGyms'
-import type { Position, Signup, WaitlistEntry } from './openGyms'
+import type { AdminWaitlistEntry, Position, Signup } from './openGyms'
 import { supabase } from './supabaseClient'
 
 export async function signIn(email: string, password: string): Promise<void> {
@@ -135,7 +135,7 @@ export async function deleteWaitlistEntry(openGymId: string, entryId: string): P
 // joined, and starts unpaid - being promoted grants a spot, not payment.
 export async function promoteWaitlistEntry(
   openGymId: string,
-  entry: WaitlistEntry,
+  entry: AdminWaitlistEntry,
   position: Position,
 ): Promise<void> {
   const { error: insertError } = await supabase.from('signups').insert({

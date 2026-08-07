@@ -2,6 +2,13 @@
 // `position_slots`, `signups`, and `waitlist` tables). Positions are plain
 // text rows in `position_slots` rather than a fixed enum, so adding a new
 // position (e.g. "Libero") is just inserting rows - no schema change needed.
+//
+// Phone numbers are deliberately absent from the public read path. The `anon`
+// role only holds column-level SELECT grants on the non-phone columns, so
+// asking for `phone_number` (or `*`) as an anonymous caller is rejected by
+// Postgres outright. The public and admin shapes are separate types below so
+// that boundary is enforced at compile time too, rather than relying on nobody
+// ever rendering a field they shouldn't.
 
 import { supabase } from './supabaseClient'
 
@@ -33,7 +40,6 @@ export interface Signup {
   timestamp: string // ISO 8601
   firstName: string
   lastName: string
-  phoneNumber: string
   groupName: string
   team: string // '' until assigned manually
   position: Position
@@ -46,18 +52,30 @@ export interface WaitlistEntry {
   timestamp: string // ISO 8601
   firstName: string
   lastName: string
-  phoneNumber: string
   groupName: string
   waiverCompleted: boolean
 }
 
-export interface OpenGymDetail extends OpenGymSummary {
+// Admin reads additionally carry the phone number, which requires a signed-in
+// session to fetch at all.
+export interface AdminSignup extends Signup {
+  phoneNumber: string
+}
+
+export interface AdminWaitlistEntry extends WaitlistEntry {
+  phoneNumber: string
+}
+
+interface OpenGymDetailBase<S extends Signup, W extends WaitlistEntry> extends OpenGymSummary {
   positions: PositionSlots[]
   groupNames: string[]
-  signups: Signup[] // paid only, sorted most recent first
-  pendingSignups: Signup[] // unpaid, sorted most recent first
-  waitlist: WaitlistEntry[] // sorted by join order, earliest first
+  signups: S[] // paid only, sorted most recent first
+  pendingSignups: S[] // unpaid, sorted most recent first
+  waitlist: W[] // sorted by join order, earliest first
 }
+
+export type OpenGymDetail = OpenGymDetailBase<Signup, WaitlistEntry>
+export type AdminOpenGymDetail = OpenGymDetailBase<AdminSignup, AdminWaitlistEntry>
 
 export interface SignupInput {
   firstName: string
@@ -180,17 +198,28 @@ function rowToSummary(row: SummaryRow): OpenGymSummary {
   }
 }
 
+// Column lists are spelled out rather than using `*` because `*` expands to
+// include phone_number, which the anon role has no grant on.
+const PUBLIC_SIGNUP_COLUMNS = 'id, created_at, first_name, last_name, group_name, position, waiver_completed, paid, team'
+const PUBLIC_WAITLIST_COLUMNS = 'id, created_at, first_name, last_name, group_name, waiver_completed'
+const ADMIN_SIGNUP_COLUMNS = `${PUBLIC_SIGNUP_COLUMNS}, phone_number`
+const ADMIN_WAITLIST_COLUMNS = `${PUBLIC_WAITLIST_COLUMNS}, phone_number`
+
+const detailSelect = (signupColumns: string, waitlistColumns: string) =>
+  `id, date, start_time, end_time, location, price, position_slots(position, available), ` +
+  `signups(${signupColumns}), waitlist(${waitlistColumns})`
+
 interface SignupRow {
   id: string
   created_at: string
   first_name: string
   last_name: string
-  phone_number: string
   group_name: string
   position: string
   waiver_completed: boolean
   paid: boolean
   team: string
+  phone_number?: string // admin reads only
 }
 
 interface WaitlistRow {
@@ -198,9 +227,9 @@ interface WaitlistRow {
   created_at: string
   first_name: string
   last_name: string
-  phone_number: string
   group_name: string
   waiver_completed: boolean
+  phone_number?: string // admin reads only
 }
 
 interface DetailRow extends SummaryRow {
@@ -209,16 +238,12 @@ interface DetailRow extends SummaryRow {
   waitlist: WaitlistRow[]
 }
 
-const DETAIL_SELECT =
-  'id, date, start_time, end_time, location, price, position_slots(position, available), signups(*), waitlist(*)'
-
 function rowToSignup(row: SignupRow): Signup {
   return {
     id: row.id,
     timestamp: row.created_at,
     firstName: row.first_name,
     lastName: row.last_name,
-    phoneNumber: row.phone_number,
     groupName: row.group_name,
     team: row.team,
     position: row.position,
@@ -233,10 +258,66 @@ function rowToWaitlistEntry(row: WaitlistRow): WaitlistEntry {
     timestamp: row.created_at,
     firstName: row.first_name,
     lastName: row.last_name,
-    phoneNumber: row.phone_number,
     groupName: row.group_name,
     waiverCompleted: row.waiver_completed,
   }
+}
+
+const rowToAdminSignup = (row: SignupRow): AdminSignup => ({
+  ...rowToSignup(row),
+  phoneNumber: row.phone_number ?? '',
+})
+
+const rowToAdminWaitlistEntry = (row: WaitlistRow): AdminWaitlistEntry => ({
+  ...rowToWaitlistEntry(row),
+  phoneNumber: row.phone_number ?? '',
+})
+
+const newestFirst = (a: { timestamp: string }, b: { timestamp: string }) =>
+  new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+
+const oldestFirst = (a: { timestamp: string }, b: { timestamp: string }) =>
+  new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+
+function assembleDetail<S extends Signup, W extends WaitlistEntry>(
+  row: DetailRow,
+  allSignups: S[],
+  allWaitlist: W[],
+): OpenGymDetailBase<S, W> {
+  const signups = allSignups.filter((s) => s.paid).sort(newestFirst)
+  const pendingSignups = allSignups.filter((s) => !s.paid).sort(newestFirst)
+  const waitlist = [...allWaitlist].sort(oldestFirst)
+  const positions: PositionSlots[] = row.position_slots.map((p) => ({
+    position: p.position,
+    available: p.available,
+    filled: signups.filter((s) => s.position === p.position).length,
+  }))
+
+  return {
+    id: row.id,
+    date: row.date,
+    start: formatTime(row.start_time),
+    end: formatTime(row.end_time),
+    startTime: row.start_time,
+    endTime: row.end_time,
+    location: row.location,
+    price: row.price,
+    spotsAvailable: positions.reduce((sum, p) => sum + p.available, 0),
+    spotsFilled: signups.length,
+    pendingCount: pendingSignups.length,
+    waitlistCount: waitlist.length,
+    positions,
+    groupNames: [...new Set(allSignups.map((s) => s.groupName).filter(Boolean))].sort(),
+    signups,
+    pendingSignups,
+    waitlist,
+  }
+}
+
+async function fetchDetailRow(id: string, select: string): Promise<DetailRow | undefined> {
+  const { data, error } = await supabase.from('open_gyms').select(select).eq('id', id).maybeSingle()
+  if (error) throw new Error(error.message)
+  return (data as DetailRow | null) ?? undefined
 }
 
 // Module-level cache, shared by every page for the lifetime of the SPA (this
@@ -298,86 +379,48 @@ export async function getOpenGym(id: string): Promise<OpenGymDetail | undefined>
   let cached = openGymDetailCache.get(id)
   if (!cached) {
     cached = (async () => {
-      const { data, error } = await supabase.from('open_gyms').select(DETAIL_SELECT).eq('id', id).maybeSingle()
-      if (error) throw new Error(error.message)
-      if (!data) return undefined
-
-      const row = data as DetailRow
-      const signups = row.signups.map(rowToSignup)
-      const paidSignups = signups
-        .filter((s) => s.paid)
-        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-      const pendingSignups = signups
-        .filter((s) => !s.paid)
-        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-      const waitlist = row.waitlist
-        .map(rowToWaitlistEntry)
-        .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
-      const groupNames = [...new Set(signups.map((s) => s.groupName).filter(Boolean))].sort()
-      const positions: PositionSlots[] = row.position_slots.map((p) => ({
-        position: p.position,
-        available: p.available,
-        filled: signups.filter((s) => s.paid && s.position === p.position).length,
-      }))
-
-      return {
-        id: row.id,
-        date: row.date,
-        start: formatTime(row.start_time),
-        end: formatTime(row.end_time),
-        startTime: row.start_time,
-        endTime: row.end_time,
-        location: row.location,
-        price: row.price,
-        spotsAvailable: positions.reduce((sum, p) => sum + p.available, 0),
-        spotsFilled: paidSignups.length,
-        pendingCount: pendingSignups.length,
-        waitlistCount: waitlist.length,
-        positions,
-        groupNames,
-        signups: paidSignups,
-        pendingSignups,
-        waitlist,
-      }
+      const row = await fetchDetailRow(id, detailSelect(PUBLIC_SIGNUP_COLUMNS, PUBLIC_WAITLIST_COLUMNS))
+      if (!row) return undefined
+      return assembleDetail(row, row.signups.map(rowToSignup), row.waitlist.map(rowToWaitlistEntry))
     })()
     openGymDetailCache.set(id, cached)
   }
   return cached
 }
 
-export async function createSignup(openGymId: string, input: SignupInput): Promise<Signup> {
-  const { data, error } = await supabase
-    .from('signups')
-    .insert({
-      open_gym_id: openGymId,
-      first_name: input.firstName,
-      last_name: input.lastName,
-      phone_number: input.phoneNumber || '',
-      group_name: input.groupName || '',
-      position: input.position,
-      waiver_completed: input.waiverCompleted,
-    })
-    .select()
-    .single()
-  if (error) throw new Error(error.message)
-  invalidateCaches(openGymId)
-  return rowToSignup(data)
+// Admin variant: includes phone numbers and is never cached, so the admin page
+// always reflects its own most recent writes.
+export async function getOpenGymForAdmin(id: string): Promise<AdminOpenGymDetail | undefined> {
+  const row = await fetchDetailRow(id, detailSelect(ADMIN_SIGNUP_COLUMNS, ADMIN_WAITLIST_COLUMNS))
+  if (!row) return undefined
+  return assembleDetail(row, row.signups.map(rowToAdminSignup), row.waitlist.map(rowToAdminWaitlistEntry))
 }
 
-export async function joinWaitlist(openGymId: string, input: WaitlistInput): Promise<WaitlistEntry> {
-  const { data, error } = await supabase
-    .from('waitlist')
-    .insert({
-      open_gym_id: openGymId,
-      first_name: input.firstName,
-      last_name: input.lastName,
-      phone_number: input.phoneNumber || '',
-      group_name: input.groupName || '',
-      waiver_completed: input.waiverCompleted,
-    })
-    .select()
-    .single()
+// Inserts don't ask for the row back: returning it would need SELECT grants on
+// the inserted columns, and no caller uses the result.
+export async function createSignup(openGymId: string, input: SignupInput): Promise<void> {
+  const { error } = await supabase.from('signups').insert({
+    open_gym_id: openGymId,
+    first_name: input.firstName,
+    last_name: input.lastName,
+    phone_number: input.phoneNumber || '',
+    group_name: input.groupName || '',
+    position: input.position,
+    waiver_completed: input.waiverCompleted,
+  })
   if (error) throw new Error(error.message)
   invalidateCaches(openGymId)
-  return rowToWaitlistEntry(data)
+}
+
+export async function joinWaitlist(openGymId: string, input: WaitlistInput): Promise<void> {
+  const { error } = await supabase.from('waitlist').insert({
+    open_gym_id: openGymId,
+    first_name: input.firstName,
+    last_name: input.lastName,
+    phone_number: input.phoneNumber || '',
+    group_name: input.groupName || '',
+    waiver_completed: input.waiverCompleted,
+  })
+  if (error) throw new Error(error.message)
+  invalidateCaches(openGymId)
 }

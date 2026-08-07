@@ -340,8 +340,8 @@ body:has(.admin-shell) {
 
 .admin-entry-main {
   display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
+  align-items: center;
+  gap: 1rem;
   min-width: 8rem;
 }
 

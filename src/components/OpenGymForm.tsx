@@ -81,12 +81,12 @@ export function OpenGymForm({ existing, submitLabel, onSubmit, onCancel }: OpenG
 
       <label className="admin-field">
         Location
-        <input value={location} onChange={(e) => setLocation(e.target.value)} required />
+        <input value={location} onChange={(e) => setLocation(e.target.value)} maxLength={200} required />
       </label>
 
       <label className="admin-field">
         Price
-        <input value={price} onChange={(e) => setPrice(e.target.value)} placeholder="$17" required />
+        <input value={price} onChange={(e) => setPrice(e.target.value)} placeholder="$17" maxLength={20} required />
       </label>
 
       <div className="admin-field">
@@ -99,6 +99,7 @@ export function OpenGymForm({ existing, submitLabel, onSubmit, onCancel }: OpenG
                 value={slot.position}
                 onChange={(e) => updateSlot(i, { position: e.target.value })}
                 placeholder="Position"
+                maxLength={40}
                 aria-label="Position name"
               />
               <input
