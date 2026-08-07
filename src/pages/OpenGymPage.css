@@ -103,8 +103,13 @@ body:has(.open-gym-page) {
   margin: 2rem 0 1rem;
 }
 
+/* Boxed so each team reads as one unit. */
 .open-gym-team-group {
   margin-top: 1.25rem;
+  padding: 0.85rem 1rem 1rem;
+  border: 1px solid #dfe4e7;
+  border-radius: 10px;
+  background: #ffffff;
 }
 
 .open-gym-team-group h3 {
@@ -126,6 +131,13 @@ body:has(.open-gym-page) {
 
 .open-gym-team-group .open-gym-signups {
   margin-top: 0;
+}
+
+/* Inverted against the white team box - only inside a team, since the
+   ungrouped, pending, and waitlist rows sit directly on the gray page and
+   need to stay white to read as rows at all. */
+.open-gym-team-group .open-gym-signups li {
+  background: #f4f6f8;
 }
 
 .open-gym-signups li {

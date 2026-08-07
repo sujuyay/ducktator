@@ -15,8 +15,9 @@ interface TeamGroup {
 }
 
 // Signups without a team (not yet assigned manually) render as a flat list,
-// same as before teams existed. Teamed groups appear first, in the order
-// their first (most recent) signup appears.
+// same as before teams existed. Teamed groups appear first, ordered by team
+// name - numerically aware, so "Team 2" sorts before "Team 10" rather than
+// after it as a plain string comparison would have it.
 function groupByTeam(signups: Signup[]): { teams: TeamGroup[]; ungrouped: Signup[] } {
   const teams: TeamGroup[] = []
   const byTeam = new Map<string, Signup[]>()
@@ -35,6 +36,8 @@ function groupByTeam(signups: Signup[]): { teams: TeamGroup[]; ungrouped: Signup
     }
     group.push(signup)
   }
+
+  teams.sort((a, b) => a.team.localeCompare(b.team, undefined, { numeric: true }))
 
   return { teams, ungrouped }
 }
