@@ -7,7 +7,7 @@
 
 import type { Session } from '@supabase/supabase-js'
 import { easternDate, invalidateCaches } from './openGyms'
-import type { AdminWaitlistEntry, Position, Signup } from './openGyms'
+import type { AdminSignup, AdminWaitlistEntry, Position, Signup } from './openGyms'
 import { supabase } from './supabaseClient'
 
 export async function signIn(email: string, password: string): Promise<void> {
@@ -124,6 +124,23 @@ export async function deleteSignup(openGymId: string, signupId: string): Promise
   invalidateCaches(openGymId)
 }
 
+// Moves a signed-up player to the back of the waitlist, freeing up their spot.
+export async function moveSignupToWaitlist(openGymId: string, signup: AdminSignup): Promise<void> {
+  const { error: insertError } = await supabase.from('waitlist').insert({
+    open_gym_id: openGymId,
+    first_name: signup.firstName,
+    last_name: signup.lastName,
+    phone_number: signup.phoneNumber,
+    group_name: signup.groupName,
+    waiver_completed: signup.waiverCompleted,
+  })
+  if (insertError) throw new Error(insertError.message)
+
+  const { error: deleteError } = await supabase.from('signups').delete().eq('id', signup.id)
+  if (deleteError) throw new Error(deleteError.message)
+  invalidateCaches(openGymId)
+}
+
 export async function deleteWaitlistEntry(openGymId: string, entryId: string): Promise<void> {
   const { error } = await supabase.from('waitlist').delete().eq('id', entryId)
   if (error) throw new Error(error.message)
@@ -154,4 +171,16 @@ export async function promoteWaitlistEntry(
   const { error: deleteError } = await supabase.from('waitlist').delete().eq('id', entry.id)
   if (deleteError) throw new Error(deleteError.message)
   invalidateCaches(openGymId)
+}
+
+// Swaps a signed-up player out for a waitlisted one: the waitlist entry takes
+// over the signup's position and the bumped player goes to the back of the
+// waitlist.
+export async function replaceSignupWithWaitlistEntry(
+  openGymId: string,
+  signup: AdminSignup,
+  entry: AdminWaitlistEntry,
+): Promise<void> {
+  await promoteWaitlistEntry(openGymId, entry, signup.position)
+  await moveSignupToWaitlist(openGymId, signup)
 }

@@ -5,7 +5,8 @@ import {
   deleteOpenGym,
   deleteSignup,
   deleteWaitlistEntry,
-  promoteWaitlistEntry,
+  moveSignupToWaitlist,
+  replaceSignupWithWaitlistEntry,
   updateOpenGym,
   updateSignup,
 } from '../api/admin'
@@ -24,12 +25,14 @@ function SignupAdminRow({
   teams,
   onChange,
   onDelete,
+  onMoveToWaitlist,
 }: {
   signup: AdminSignup
   positions: Position[]
   teams: string[]
   onChange: (changes: Partial<Pick<AdminSignup, 'paid' | 'team' | 'position'>>) => Promise<void>
   onDelete: () => Promise<void>
+  onMoveToWaitlist: () => Promise<void>
 }) {
   return (
     <li className="admin-entry">
@@ -88,6 +91,10 @@ function SignupAdminRow({
             ))}
           </select>
         </label>
+
+        <button type="button" className="admin-button admin-button-secondary" onClick={() => void onMoveToWaitlist()}>
+          Move to Waitlist
+        </button>
       </div>
     </li>
   )
@@ -95,16 +102,17 @@ function SignupAdminRow({
 
 function WaitlistAdminRow({
   entry,
-  positions,
-  onPromote,
+  signups,
+  onReplace,
   onDelete,
 }: {
   entry: AdminWaitlistEntry
-  positions: Position[]
-  onPromote: (position: Position) => Promise<void>
+  signups: AdminSignup[]
+  onReplace: (signup: AdminSignup) => Promise<void>
   onDelete: () => Promise<void>
 }) {
-  const [position, setPosition] = useState<Position>(positions[0] ?? '')
+  const [signupId, setSignupId] = useState('')
+  const selectedSignup = signups.find((s) => s.id === signupId)
 
   return (
     <li className="admin-entry">
@@ -121,11 +129,12 @@ function WaitlistAdminRow({
 
       <div className="admin-entry-controls">
         <label className="admin-inline-field">
-          Position
-          <select value={position} onChange={(e) => setPosition(e.target.value)}>
-            {positions.map((p) => (
-              <option key={p} value={p}>
-                {p}
+          Replace
+          <select value={signupId} onChange={(e) => setSignupId(e.target.value)}>
+            <option value="">Select a player…</option>
+            {signups.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.firstName} {s.lastName}
               </option>
             ))}
           </select>
@@ -134,10 +143,10 @@ function WaitlistAdminRow({
         <button
           type="button"
           className="admin-button admin-promote-button"
-          disabled={!position}
-          onClick={() => void onPromote(position)}
+          disabled={!selectedSignup}
+          onClick={() => selectedSignup && void onReplace(selectedSignup)}
         >
-          Promote
+          Replace
         </button>
 
         <button type="button" className="admin-danger-button" onClick={() => void onDelete()}>
@@ -153,6 +162,9 @@ function AdminGymPageContent({ id }: { id: string }) {
   const [detail, setDetail] = useState<AdminOpenGymDetail | null | undefined>(null)
   const [error, setError] = useState<string | null>(null)
   const [editing, setEditing] = useState(false)
+  // Explicit count entered by the admin; null until they've touched it, so we
+  // can fall back to a spots-based guess for a gym they haven't set it for yet.
+  const [teamCount, setTeamCount] = useState<number | null>(null)
 
   const refresh = useCallback(() => {
     getOpenGymForAdmin(id)
@@ -193,8 +205,9 @@ function AdminGymPageContent({ id }: { id: string }) {
   }
 
   const positions = detail.positions.map((p) => p.position)
-  // One team per 7 spots, so a 28 spot gym offers Team 1 through Team 4.
-  const teams = Array.from({ length: Math.floor(detail.spotsAvailable / 7) }, (_, i) => `Team ${i + 1}`)
+  // Defaults to one team per 7 spots until the admin sets an explicit count.
+  const teamCountValue = teamCount ?? Math.floor(detail.spotsAvailable / 7)
+  const teams = Array.from({ length: teamCountValue }, (_, i) => `Team ${i + 1}`)
   // Paid and pending together, newest first - the admin manages one list and
   // the paid checkbox is what splits them on the public page.
   const allSignups = [...detail.signups, ...detail.pendingSignups].sort(
@@ -242,12 +255,25 @@ function AdminGymPageContent({ id }: { id: string }) {
         </div>
 
         {editing ? (
-          <OpenGymForm
-            existing={detail}
-            submitLabel="Save Changes"
-            onSubmit={handleSave}
-            onCancel={() => setEditing(false)}
-          />
+          <>
+            <label className="admin-field" htmlFor="admin-team-count">
+              Teams
+              <input
+                id="admin-team-count"
+                className="admin-team-input"
+                type="number"
+                min={0}
+                value={teamCountValue}
+                onChange={(e) => setTeamCount(Math.max(0, Number(e.target.value) || 0))}
+              />
+            </label>
+            <OpenGymForm
+              existing={detail}
+              submitLabel="Save Changes"
+              onSubmit={handleSave}
+              onCancel={() => setEditing(false)}
+            />
+          </>
         ) : (
           <>
             <dl className="admin-detail-list">
@@ -305,6 +331,7 @@ function AdminGymPageContent({ id }: { id: string }) {
                     await deleteSignup(id, signup.id)
                   })
                 }
+                onMoveToWaitlist={() => run(() => moveSignupToWaitlist(id, signup))}
               />
             ))}
           </ul>
@@ -321,8 +348,8 @@ function AdminGymPageContent({ id }: { id: string }) {
               <WaitlistAdminRow
                 key={entry.id}
                 entry={entry}
-                positions={positions}
-                onPromote={(position) => run(() => promoteWaitlistEntry(id, entry, position))}
+                signups={allSignups}
+                onReplace={(signup) => run(() => replaceSignupWithWaitlistEntry(id, signup, entry))}
                 onDelete={() =>
                   run(async () => {
                     if (!window.confirm(`Remove ${entry.firstName} ${entry.lastName} from the waitlist?`)) return
