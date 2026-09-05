@@ -42,6 +42,7 @@ export interface OpenGymInput {
   location: string
   price: string
   slots: PositionSlotInput[]
+  teamCount: number
 }
 
 // Slots live in their own table, so saving a gym means replacing its slot
@@ -69,6 +70,7 @@ export async function createOpenGym(input: OpenGymInput): Promise<string> {
       end_time: input.endTime,
       location: input.location,
       price: input.price,
+      team_count: input.teamCount,
     })
     .select('id')
     .single()
@@ -88,6 +90,7 @@ export async function updateOpenGym(id: string, input: OpenGymInput): Promise<vo
       end_time: input.endTime,
       location: input.location,
       price: input.price,
+      team_count: input.teamCount,
     })
     .eq('id', id)
   if (error) throw new Error(error.message)

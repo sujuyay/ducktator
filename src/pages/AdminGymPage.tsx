@@ -162,9 +162,6 @@ function AdminGymPageContent({ id }: { id: string }) {
   const [detail, setDetail] = useState<AdminOpenGymDetail | null | undefined>(null)
   const [error, setError] = useState<string | null>(null)
   const [editing, setEditing] = useState(false)
-  // Explicit count entered by the admin; null until they've touched it, so we
-  // can fall back to a spots-based guess for a gym they haven't set it for yet.
-  const [teamCount, setTeamCount] = useState<number | null>(null)
 
   const refresh = useCallback(() => {
     getOpenGymForAdmin(id)
@@ -205,9 +202,7 @@ function AdminGymPageContent({ id }: { id: string }) {
   }
 
   const positions = detail.positions.map((p) => p.position)
-  // Defaults to one team per 7 spots until the admin sets an explicit count.
-  const teamCountValue = teamCount ?? Math.floor(detail.spotsAvailable / 7)
-  const teams = Array.from({ length: teamCountValue }, (_, i) => `Team ${i + 1}`)
+  const teams = Array.from({ length: detail.teamCount }, (_, i) => `Team ${i + 1}`)
   // Paid and pending together, newest first - the admin manages one list and
   // the paid checkbox is what splits them on the public page.
   const allSignups = [...detail.signups, ...detail.pendingSignups].sort(
@@ -255,25 +250,12 @@ function AdminGymPageContent({ id }: { id: string }) {
         </div>
 
         {editing ? (
-          <>
-            <label className="admin-field" htmlFor="admin-team-count">
-              Teams
-              <input
-                id="admin-team-count"
-                className="admin-team-input"
-                type="number"
-                min={0}
-                value={teamCountValue}
-                onChange={(e) => setTeamCount(Math.max(0, Number(e.target.value) || 0))}
-              />
-            </label>
-            <OpenGymForm
-              existing={detail}
-              submitLabel="Save Changes"
-              onSubmit={handleSave}
-              onCancel={() => setEditing(false)}
-            />
-          </>
+          <OpenGymForm
+            existing={detail}
+            submitLabel="Save Changes"
+            onSubmit={handleSave}
+            onCancel={() => setEditing(false)}
+          />
         ) : (
           <>
             <dl className="admin-detail-list">

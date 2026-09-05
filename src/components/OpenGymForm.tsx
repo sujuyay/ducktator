@@ -30,6 +30,9 @@ export function OpenGymForm({ existing, submitLabel, onSubmit, onCancel }: OpenG
   const [slots, setSlots] = useState<PositionSlotInput[]>(
     existing ? existing.positions.map((p) => ({ position: p.position, available: p.available })) : DEFAULT_SLOTS,
   )
+  const [teamCount, setTeamCount] = useState(
+    existing ? existing.teamCount : Math.floor(DEFAULT_SLOTS.reduce((sum, s) => sum + s.available, 0) / 7),
+  )
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -60,6 +63,7 @@ export function OpenGymForm({ existing, submitLabel, onSubmit, onCancel }: OpenG
         location: location.trim(),
         price: price.trim(),
         slots: validSlots.map((s) => ({ position: s.position.trim(), available: s.available })),
+        teamCount,
       })
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Something went wrong saving this open gym.')
@@ -87,6 +91,17 @@ export function OpenGymForm({ existing, submitLabel, onSubmit, onCancel }: OpenG
       <label className="admin-field">
         Price
         <input value={price} onChange={(e) => setPrice(e.target.value)} placeholder="$17" maxLength={20} required />
+      </label>
+
+      <label className="admin-field">
+        Teams
+        <input
+          className="admin-team-input"
+          type="number"
+          min={0}
+          value={teamCount}
+          onChange={(e) => setTeamCount(Math.max(0, Number(e.target.value) || 0))}
+        />
       </label>
 
       <div className="admin-field">

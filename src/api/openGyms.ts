@@ -72,6 +72,7 @@ interface OpenGymDetailBase<S extends Signup, W extends WaitlistEntry> extends O
   signups: S[] // paid only, sorted most recent first
   pendingSignups: S[] // unpaid, sorted most recent first
   waitlist: W[] // sorted by join order, earliest first
+  teamCount: number
 }
 
 export type OpenGymDetail = OpenGymDetailBase<Signup, WaitlistEntry>
@@ -206,7 +207,7 @@ const ADMIN_SIGNUP_COLUMNS = `${PUBLIC_SIGNUP_COLUMNS}, phone_number`
 const ADMIN_WAITLIST_COLUMNS = `${PUBLIC_WAITLIST_COLUMNS}, phone_number`
 
 const detailSelect = (signupColumns: string, waitlistColumns: string) =>
-  `id, date, start_time, end_time, location, price, position_slots(position, available), ` +
+  `id, date, start_time, end_time, location, price, team_count, position_slots(position, available), ` +
   `signups(${signupColumns}), waitlist(${waitlistColumns})`
 
 interface SignupRow {
@@ -233,6 +234,7 @@ interface WaitlistRow {
 }
 
 interface DetailRow extends SummaryRow {
+  team_count: number | null
   position_slots: { position: string; available: number }[]
   signups: SignupRow[]
   waitlist: WaitlistRow[]
@@ -311,6 +313,8 @@ function assembleDetail<S extends Signup, W extends WaitlistEntry>(
     signups,
     pendingSignups,
     waitlist,
+    // Gyms saved before team_count existed fall back to one team per 7 spots.
+    teamCount: row.team_count ?? Math.floor(positions.reduce((sum, p) => sum + p.available, 0) / 7),
   }
 }
 
