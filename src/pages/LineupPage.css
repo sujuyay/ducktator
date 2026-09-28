@@ -1,0 +1,10 @@
+/* The lineup library's toasts are transient, non-interactive messages, so it
+   sets pointer-events: none on .toast - undo that for our defaultMessage's
+   link (only .toast-info ever carries a link, so this is safely scoped). */
+.toast-info {
+  pointer-events: auto;
+}
+
+.toast-info a {
+  color: var(--accent-primary);
+}

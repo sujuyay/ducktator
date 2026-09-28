@@ -6,6 +6,7 @@ import {
   deleteSignup,
   deleteWaitlistEntry,
   moveSignupToWaitlist,
+  promoteWaitlistEntry,
   replaceSignupWithWaitlistEntry,
   updateOpenGym,
   updateSignup,
@@ -103,16 +104,21 @@ function SignupAdminRow({
 function WaitlistAdminRow({
   entry,
   signups,
+  positions,
   onReplace,
+  onPromote,
   onDelete,
 }: {
   entry: AdminWaitlistEntry
   signups: AdminSignup[]
+  positions: Position[]
   onReplace: (signup: AdminSignup) => Promise<void>
+  onPromote: (position: Position) => Promise<void>
   onDelete: () => Promise<void>
 }) {
   const [signupId, setSignupId] = useState('')
   const selectedSignup = signups.find((s) => s.id === signupId)
+  const [promotePosition, setPromotePosition] = useState(positions[0] ?? '')
 
   return (
     <li className="admin-entry">
@@ -147,6 +153,26 @@ function WaitlistAdminRow({
           onClick={() => selectedSignup && void onReplace(selectedSignup)}
         >
           Replace
+        </button>
+
+        <label className="admin-inline-field">
+          Position
+          <select value={promotePosition} onChange={(e) => setPromotePosition(e.target.value)}>
+            {positions.map((p) => (
+              <option key={p} value={p}>
+                {p}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <button
+          type="button"
+          className="admin-button admin-promote-button"
+          disabled={!promotePosition}
+          onClick={() => promotePosition && void onPromote(promotePosition)}
+        >
+          Promote
         </button>
 
         <button type="button" className="admin-danger-button" onClick={() => void onDelete()}>
@@ -331,7 +357,9 @@ function AdminGymPageContent({ id }: { id: string }) {
                 key={entry.id}
                 entry={entry}
                 signups={allSignups}
+                positions={positions}
                 onReplace={(signup) => run(() => replaceSignupWithWaitlistEntry(id, signup, entry))}
+                onPromote={(position) => run(() => promoteWaitlistEntry(id, entry, position))}
                 onDelete={() =>
                   run(async () => {
                     if (!window.confirm(`Remove ${entry.firstName} ${entry.lastName} from the waitlist?`)) return

@@ -1,6 +1,7 @@
 import { LineupSimulator, PLAYER_COUNT } from '@jkim430/lineup'
 import type { DeepPartial, LineupSettings, RotationValidator } from '@jkim430/lineup'
 import '@jkim430/lineup/style.css'
+import './LineupPage.css'
 import { Header } from '../Header'
 
 // Bench method: scale the required females on court to the roster size -
@@ -116,6 +117,14 @@ const settings: DeepPartial<LineupSettings> = {
     accentSecondary: '#057a86',
   },
   defaultTheme: 'light',
+  defaultMessage: (
+    <span>
+      Enforces league rules. Generic version:{' '}
+      <a href="https://vblnp.app" target="_blank" rel="noreferrer">
+        vblnp.app
+      </a>
+    </span>
+  ),
 }
 
 // Umami's tracking script (loaded in index.html) exposes window.umami once ready.
